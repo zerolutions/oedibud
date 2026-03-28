@@ -1,0 +1,46 @@
+﻿@page "/dashboard"
+
+@using BlazorBootstrap
+@using oedibud.Services
+@using oedibud.Models
+
+@inject ForecastService ForecastService
+
+<h3>Budget Forecast</h3>
+
+<LineChart @ref="chart" />
+
+@code {
+
+    private LineChart chart = default!;
+    private LineChartOptions lineChartOptions = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var forecast = await ForecastService.GetForecast();
+
+            var labels = forecast.Select(x => x.Month.ToString("MM/yyyy")).ToList();
+
+            var data = forecast.Select(x => (double?)x.Cost).ToList();
+            lineChartOptions = new() { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
+            lineChartOptions.Scales.Y!.Max = 250;
+
+            var chartData = new ChartData
+            {
+                Labels = labels,
+                Datasets = new List<IChartDataset>
+                {
+                    new LineChartDataset
+                    {
+                        Label = "Forecast",
+                        Data = data
+                    }
+                }
+            };
+
+            await chart.InitializeAsync(chartData, lineChartOptions );
+        }
+    }
+}

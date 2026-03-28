@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Ressources\Entgelt_2026-04-01_2027-02-28.csv" />
+    <None Remove="Ressources\Entgelt_2027-03-01_2027-12-31.csv" />
+    <None Remove="Ressources\Entgelt_2028-01-01_2028-01-31.csv" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Ressources\Entgelt_2026-04-01_2027-02-28.csv" />
+    <EmbeddedResource Include="Ressources\Entgelt_2027-03-01_2027-12-31.csv" />
+    <EmbeddedResource Include="Ressources\Entgelt_2028-01-01_2028-01-31.csv" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Blazor.Bootstrap" Version="3.5.0" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.13">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

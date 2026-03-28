@@ -1,0 +1,104 @@
+﻿@page "/employees"
+
+@using Microsoft.EntityFrameworkCore
+@using oedibud.Models
+@using oedibud.Data
+@inject BudgetDbContext Db
+
+<h3>Mitarbeiter</h3>
+
+<div class="mb-3">
+    <input @bind="employee.Name" placeholder="Name" class="form-control mb-1" />
+    <input @bind="employee.Group" placeholder="Group (E13)" class="form-control mb-1" />
+    <input type="number" @bind="employee.Level" class="form-control mb-1" />
+    <input type="date" @bind="employee.HireDate" class="form-control mb-1" />
+    <button type="button" class="btn btn-primary mt-2" @onclick="Add">Add</button>
+</div>
+
+<!-- Feedback für den Benutzer -->
+@if (!string.IsNullOrEmpty(message))
+{
+    <p class="text-info">@message</p>
+}
+
+<hr />
+
+@if (employees.Count == 0)
+{
+    <p>Keine Mitarbeiter vorhanden.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Group</th>
+                <th>Level</th>
+                <th>HireDate</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in employees)
+            {
+                <tr>
+                    <td>@e.Id</td>
+                    <td>@e.Name</td>
+                    <td>@e.Group</td>
+                    <td>@e.Level</td>
+                    <td>@e.HireDate.ToShortDateString()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private Employee employee = new()
+    {
+        HireDate = DateTime.Today
+    };
+
+    private List<Employee> employees = new();
+    private string message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+    }
+
+    private async Task LoadEmployees()
+    {
+        employees = await Db.Employees
+            .OrderByDescending(e => e.HireDate)
+            .ToListAsync();
+    }
+
+    private async Task Add()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(employee.Name))
+            {
+                message = "Name darf nicht leer sein!";
+                return;
+            }
+
+            Db.Employees.Add(employee);
+            await Db.SaveChangesAsync();
+
+            message = $"Mitarbeiter '{employee.Name}' gespeichert!";
+
+            await LoadEmployees();
+
+            employee = new Employee { HireDate = DateTime.Today };
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            message = "Fehler beim Speichern: " + ex.Message;
+        }
+    }
+}
