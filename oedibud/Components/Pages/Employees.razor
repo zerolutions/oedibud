@@ -1,6 +1,7 @@
 ﻿@page "/employees"
 
 @using Microsoft.EntityFrameworkCore
+@using System.Linq
 @using oedibud.Models
 @using oedibud.Data
 @inject BudgetDbContext Db
@@ -8,10 +9,17 @@
 <h3>Mitarbeiter</h3>
 
 <div class="mb-3">
-    <input @bind="employee.Name" placeholder="Name" class="form-control mb-1" />
-    <input @bind="employee.Group" placeholder="Group (E13)" class="form-control mb-1" />
-    <input type="number" @bind="employee.Level" class="form-control mb-1" />
-    <input type="date" @bind="employee.HireDate" class="form-control mb-1" />
+    Name: <input @bind="employee.Name" placeholder="Name" class="form-control mb-1" />
+    Eingestellt am:<input type="date" @bind="employee.HireDate" class="form-control mb-1" />
+    Gruppe:
+    <select @bind="employee.Group" class="form-control mb-1">
+        @foreach (var g in Enum.GetValues<EmployeeGroup>())
+        {
+            <option value="@g">@GetGroupName(g)</option>
+        }
+    </select>
+    Angerechnete Erfahrung (Monate):<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-1" />
+    @* Erfahrung:<input type="number" @bind="employee.Level" class="form-control mb-1" /> *@
     <button type="button" class="btn btn-primary mt-2" @onclick="Add">Add</button>
 </div>
 
@@ -45,7 +53,7 @@ else
                 <tr>
                     <td>@e.Id</td>
                     <td>@e.Name</td>
-                    <td>@e.Group</td>
+                    <td>@GetGroupName(e.Group)</td>
                     <td>@e.Level</td>
                     <td>@e.HireDate.ToShortDateString()</td>
                 </tr>
@@ -100,5 +108,18 @@ else
         {
             message = "Fehler beim Speichern: " + ex.Message;
         }
+    }
+
+    private string GetGroupName(EmployeeGroup group)
+    {
+        var mem = typeof(EmployeeGroup).GetMember(group.ToString()).FirstOrDefault();
+        if (mem != null)
+        {
+            var disp = mem.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.DisplayAttribute), false)
+                         .OfType<System.ComponentModel.DataAnnotations.DisplayAttribute>()
+                         .FirstOrDefault();
+            if (disp != null) return disp.Name ?? group.ToString();
+        }
+        return group.ToString();
     }
 }
