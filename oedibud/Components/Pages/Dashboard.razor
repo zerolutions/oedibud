@@ -1,6 +1,6 @@
 ﻿@page "/dashboard"
 
-@using BlazorBootstrap
+@using Blazorise.Charts
 @using oedibud.Services
 @using oedibud.Models
 
@@ -8,12 +8,12 @@
 
 <h3>Budget Forecast</h3>
 
-<LineChart @ref="chart" />
+<Blazorise.Charts.LineChart TItem="double?" @ref="chart" />
 
 @code {
 
-    private LineChart chart = default!;
-    private LineChartOptions lineChartOptions = default!;
+    private Blazorise.Charts.LineChart<double?> chart = default!;
+    private Blazorise.Charts.LineChartOptions lineChartOptions = default!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -24,23 +24,16 @@
             var labels = forecast.Select(x => x.Month.ToString("MM/yyyy")).ToList();
 
             var data = forecast.Select(x => (double?)x.Cost).ToList();
-            lineChartOptions = new() { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
-            lineChartOptions.Scales.Y!.Max = 250;
+            // lineChartOptions = new() { Responsive = true, Interaction = new Blazorise.Charts.ChartInteraction { Mode = InteractionMode.Index } };
+            // lineChartOptions.Scales.Y!.Max = 250;
 
-            var chartData = new ChartData
+            var dataset = new LineChartDataset<double?>
             {
-                Labels = labels,
-                Datasets = new List<IChartDataset>
-                {
-                    new LineChartDataset
-                    {
-                        Label = "Forecast",
-                        Data = data
-                    }
-                }
+                Label = "Forecast",
+                Data = data
             };
 
-            await chart.InitializeAsync(chartData, lineChartOptions );
+            // await chart.AddLabelsDatasetsAndUpdate(labels, new IChartDataset[] { dataset });
         }
     }
 }

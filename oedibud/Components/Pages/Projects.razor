@@ -1,0 +1,286 @@
+﻿@page "/projects"
+
+@using Microsoft.EntityFrameworkCore
+@using oedibud.Models
+@using oedibud.Data
+@inject IDbContextFactory<BudgetDbContext> DbFactory
+
+<h3>Projekte</h3>
+
+<div class="mb-3">
+    Titel:<input @bind="project.Title" class="form-control mb-1" />
+    Projektstart:<input type="date" @bind="project.Start" class="form-control mb-1" />
+    Projektende:<input type="date" @bind="project.End" class="form-control mb-1" />
+    <button class="btn btn-primary" @onclick="AddProject">Hinzufügen</button>
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="mt-2 text-info">@message</div>
+    }
+</div>
+<hr />
+
+@if (projects.Count == 0)
+{
+    <p>Keine Projekte verfügbar.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Titel</th>
+                <th>Projektstart</th>
+                <th>Projektende</th>
+                <th>Gesamt</th>
+                <th>Zahlungen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in projects)
+            {
+                <tr>
+                    <td>@p.Id</td>
+                    <td>@p.Title</td>
+                    <td>@p.Start.ToShortDateString()</td>
+                    <td>@p.End.ToShortDateString()</td>
+                    <td>@p.TotalAmount.ToString("C")</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
+                            @(expanded.Contains(p.Id) ? "-" : "+")
+                        </button>
+                    </td>
+
+                    <td>
+                        <button type="button" class="btn btn-danger" @onclick="@(a => DeleteProjectAndPayments(@p))">Projekt löschen</button>
+                    </td>
+                </tr>
+                @if (expanded.Contains(p.Id))
+                {
+                    <tr>
+                        <td colspan="7" class="p-0">
+                            <div class="p-3">
+                                <h6>Personalmittel</h6>
+                                @if (p.Payments.Count == 0)
+                                {
+                                    <div><em>Keine Personalmittel</em></div>
+                                }
+                                else
+                                {
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr><th>Date</th><th>Amount</th><th></th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var pay in p.Payments.OrderByDescending(x => x.Date))
+                                            {
+                                                <tr>
+                                                    <td>@pay.Date.ToShortDateString()</td>
+                                                    <td>@pay.Amount.ToString("C")</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Zahlung löschen</button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+
+                                <div class="border-top pt-2 mt-2">
+                                    @* <h6>Add payment</h6> *@
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-auto">
+                                            <label class="form-label">Datum</label>
+                                            <input type="date" class="form-control" @bind="paymentInputs[p.Id].Date" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Betrag</label>
+                                            <input type="number" step="0.01" class="form-control" @bind="paymentInputs[p.Id].Amount" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <button class="btn btn-success" @onclick="() => AddPayment(p)">Hinzufügen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Project> projects = new();
+    // private string newProjectTitle = "";
+
+    private Project project = new()
+    {
+        Start = DateTime.Today,
+        End = DateTime.Today.AddYears(3)
+    };
+    private string message = "";
+    private HashSet<int> expanded = new();
+
+    // simple per-project input model for new payment
+    private class PaymentInput
+    {
+        public DateTime Date { get; set; }
+        public decimal Amount { get; set; }
+
+        public PaymentInput() { }
+        public PaymentInput(DateTime date, decimal amount)
+        {
+            Date = date;
+            Amount = amount;
+        }
+    }
+    private Dictionary<int, PaymentInput> paymentInputs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjects();
+    }
+
+    private async Task LoadProjects()
+    {
+        using var db = DbFactory.CreateDbContext();
+        projects = await db.Projects
+            .Include(p => p.Payments)
+            .OrderByDescending(p => p.Start)
+            .ToListAsync();
+
+        // ensure paymentInputs entries exist
+        paymentInputs = projects.ToDictionary(p => p.Id, p => new PaymentInput(DateTime.Today, 0m));
+    }
+
+    private void ToggleExpand(int projectId)
+    {
+        if (!expanded.Remove(projectId))
+        {
+            expanded.Add(projectId);
+            if (!paymentInputs.ContainsKey(projectId))
+                paymentInputs[projectId] = new PaymentInput(DateTime.Today, 0m);
+        }
+    }
+
+    private async Task AddProject()
+    {
+        if (string.IsNullOrWhiteSpace(project.Title))
+        {
+            message = "Eingabe eines Titels ist notwendig.";
+            return;
+        }
+
+        try
+        {
+            // var project = new Project { Title = newProjectTitle, Created = DateTime.UtcNow };
+
+            using var db = DbFactory.CreateDbContext();
+            db.Projects.Add(project);
+            await db.SaveChangesAsync();
+
+            // load payments navigation empty
+            project.Payments = new List<Payment>();
+            projects.Insert(0, project);
+            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m);
+            // newProjectTitle = "";
+            message = $"Projekt '{project.Title}' hinzugefügt.";
+            project = new()
+            {
+                Start = DateTime.Today,
+                End = DateTime.Today.AddYears(3)
+            };
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private async Task AddPayment(Project project)
+    {
+        if (!paymentInputs.TryGetValue(project.Id, out var input))
+            return;
+
+        if (input.Amount == 0m)
+        {
+            message = "Betrag muss größer als 0 sein.";
+            return;
+        }
+
+        var payment = new Payment
+        {
+            ProjectId = project.Id,
+            Date = input.Date,
+            Amount = input.Amount
+        };
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            db.Payments.Add(payment);
+            await db.SaveChangesAsync();
+
+            // update local model (ensure list exists)
+            var target = projects.FirstOrDefault(p => p.Id == project.Id);
+            if (target != null)
+            {
+                target.Payments.Add(payment);
+            }
+
+            // reset input
+            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m);
+            message = "Zahlung hinzugefügt.";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private async Task DeleteProjectAndPayments(Project project)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            // load payments to ensure cascade delete works
+            var toDelete = await db.Projects.Include(p => p.Payments).FirstOrDefaultAsync(p => p.Id == project.Id);
+            if (toDelete != null)
+            {
+                db.Projects.Remove(toDelete);
+                await db.SaveChangesAsync();
+                projects.RemoveAll(p => p.Id == project.Id);
+                paymentInputs.Remove(project.Id);
+                message = "Projekt gelöscht.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private async Task DeletePayment(Project project, Payment payment)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            db.Payments.Remove(payment);
+            await db.SaveChangesAsync();
+
+            var target = projects.FirstOrDefault(p => p.Id == project.Id);
+            if (target != null)
+            {
+                target.Payments.RemoveAll(p => p.Id == payment.Id);
+            }
+            message = "Zahlung gelöscht.";
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+}

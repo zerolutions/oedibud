@@ -11,4 +11,7 @@ public class BudgetDbContext : DbContext
     }
 
     public DbSet<Employee> Employees { get; set; } = null!;
+    // inside your existing BudgetDbContext class:
+    public DbSet<Project> Projects { get; set; }
+    public DbSet<Payment> Payments { get; set; }
 }

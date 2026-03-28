@@ -9,7 +9,7 @@
 <h3>Mitarbeiter</h3>
 
 <div class="mb-3">
-    Name: <input @bind="employee.Name" placeholder="Name" class="form-control mb-1" />
+    Name: <input @bind="employee.Name" class="form-control mb-1" />
     Eingestellt am:<input type="date" @bind="employee.HireDate" class="form-control mb-1" />
     Gruppe:
     <select @bind="employee.Group" class="form-control mb-1">
@@ -20,7 +20,7 @@
     </select>
     Angerechnete Erfahrung (Monate):<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-1" />
     @* Erfahrung:<input type="number" @bind="employee.Level" class="form-control mb-1" /> *@
-    <button type="submit" class="btn btn-primary mt-2" @onclick="Add">Add</button>
+    <button type="button" class="btn btn-primary mt-2" @onclick="Add">Hinzufügen</button>
 </div>
 
 <!-- Feedback für den Benutzer -->
@@ -42,9 +42,12 @@ else
             <tr>
                 <th>ID</th>
                 <th>Name</th>
-                <th>Group</th>
-                <th>Level</th>
-                <th>HireDate</th>
+                <th>Gruppe</th>
+                <th>Akt. Stufe</th>
+                <th>Eingestellt</th>
+                <th>Vorerfahrung (M.)</th>
+                <th>Nächste Stufe</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -56,6 +59,11 @@ else
                     <td>@GetGroupName(e.Group)</td>
                     <td>@e.Level</td>
                     <td>@e.HireDate.ToShortDateString()</td>
+                    <td>@e.ExperienceMonth</td>
+                    <td>@e.NextLevel.ToShortDateString()</td>
+                    <td>
+                        <button type="button" class="btn btn-danger" @onclick="@(a => Delete(@e))">Löschen</button>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -87,7 +95,6 @@ else
 
     private async Task Add()
     {
-        Console.WriteLine($"Adding employee: {employee.Name}, Group: {employee.Group}, HireDate: {employee.HireDate}, ExperienceMonth: {employee.ExperienceMonth}");
         try
         {
             if (string.IsNullOrWhiteSpace(employee.Name))
@@ -120,7 +127,26 @@ else
             message = ex.ToString(); // wichtig zum Debuggen!
         }
     }
+    private async Task Delete(Employee e)
+    {
+        // Console.WriteLine($"Adding employee: {employee.Name}, Group: {employee.Group}, HireDate: {employee.HireDate}, ExperienceMonth: {employee.ExperienceMonth}");
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
 
+            db.Employees.Remove(e);
+            await db.SaveChangesAsync();
+
+            message = $"Mitarbeiter '{e.Name}' gelöscht!";
+
+            employees.Remove(e);
+
+        }
+        catch (Exception ex)
+        {
+            message = ex.ToString(); // wichtig zum Debuggen!
+        }
+    }
     private string GetGroupName(EmployeeGroup group)
     {
         var mem = typeof(EmployeeGroup).GetMember(group.ToString()).FirstOrDefault();

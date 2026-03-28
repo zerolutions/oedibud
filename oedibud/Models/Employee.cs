@@ -1,30 +1,49 @@
-﻿namespace oedibud.Models;
+﻿using oedibud.Models;
 
 public class Employee
 {
-    private readonly int level;
+    private static readonly int[] LevelThresholds = { 0, 12, 36, 72, 120, 180 }; // month thresholds for levels 1..6
 
     public int Id { get; set; }
-
     public string Name { get; set; } = "";
-
     public EmployeeGroup Group { get; set; } = EmployeeGroup.E13;
+    public DateTime HireDate { get; set; }
+    public int ExperienceMonth { get; set; }
 
     public int Level
     {
         get
         {
-            if (ExperienceMonth < 12) return 1;
-            if (ExperienceMonth < 36) return 2;
-            if (ExperienceMonth < 72) return 3;
-            if (ExperienceMonth < 120) return 4;
-            if (ExperienceMonth < 180) return 5;
-            return 6;
+            var today = DateTime.Today;
+            int monthsSinceHire = (today.Year - HireDate.Year) * 12 + (today.Month - HireDate.Month) + ExperienceMonth;
 
+            // find highest level whose threshold is <= monthsSinceHire
+            for (int lvl = LevelThresholds.Length; lvl >= 1; lvl--)
+            {
+                int threshold = LevelThresholds[Math.Max(0, lvl - 1)];
+                if (monthsSinceHire >= threshold) return Math.Min(lvl, LevelThresholds.Length);
+            }
+            return 1;
         }
     }
 
-    public DateTime HireDate { get; set; }
+    public DateTime NextLevel
+    {
+        get
+        {
+            int current = Level;
+            if (current >= LevelThresholds.Length) // already max level
+                return DateTime.MaxValue;
 
-    public int ExperienceMonth { get; set; }
+            int nextThreshold = LevelThresholds[current]; // next level threshold in months
+            // months from HireDate to reach next threshold, accounting for prior experience
+            int monthsToNextFromHire = nextThreshold - ExperienceMonth;
+            if (monthsToNextFromHire <= 0) // already reached by prior experience
+                return HireDate;
+
+            var olddate = HireDate.AddMonths(monthsToNextFromHire);
+
+            return new DateTime(olddate.Year, olddate.Month, 1,  0, 0, 0, olddate.Kind); ;
+        }
+    }
 }
