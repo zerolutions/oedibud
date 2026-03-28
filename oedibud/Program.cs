@@ -11,7 +11,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHttpClient();
 
-builder.Services.AddDbContext<BudgetDbContext>(options =>
+builder.Services.AddDbContextFactory<BudgetDbContext>(options =>
     options.UseSqlite("Data Source=oedibud.db"));
 
 builder.Services.AddSingleton<TvLSalaryService>();

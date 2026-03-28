@@ -1,5 +1,8 @@
-﻿using System.Globalization;
+﻿using oedibud.Models;
+using System.Globalization;
 using System.Reflection;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
 
 namespace oedibud.Services;
 
@@ -55,9 +58,13 @@ public class TvLSalaryService
         }
     }
 
-    public decimal GetSalary(string group, int level)
+    public decimal GetSalary(EmployeeGroup group, int level)
     {
-        if (_data.TryGetValue(group, out var levels))
+        // Resolve the DisplayAttribute (if present) from the enum member:
+        var member = typeof(EmployeeGroup).GetMember(group.ToString()).FirstOrDefault();
+        var displayName = member?.GetCustomAttribute<DisplayAttribute>()?.Name ?? group.ToString();
+
+        if (_data.TryGetValue(displayName, out var levels))
         {
             if (levels.TryGetValue(level, out var salary))
                 return salary;

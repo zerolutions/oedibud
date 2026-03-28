@@ -4,7 +4,7 @@
 @using System.Linq
 @using oedibud.Models
 @using oedibud.Data
-@inject BudgetDbContext Db
+@inject IDbContextFactory<BudgetDbContext> DbFactory
 
 <h3>Mitarbeiter</h3>
 
@@ -20,7 +20,7 @@
     </select>
     Angerechnete Erfahrung (Monate):<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-1" />
     @* Erfahrung:<input type="number" @bind="employee.Level" class="form-control mb-1" /> *@
-    <button type="button" class="btn btn-primary mt-2" @onclick="Add">Add</button>
+    <button type="submit" class="btn btn-primary mt-2" @onclick="Add">Add</button>
 </div>
 
 <!-- Feedback für den Benutzer -->
@@ -78,13 +78,16 @@ else
 
     private async Task LoadEmployees()
     {
-        employees = await Db.Employees
+        using var db = DbFactory.CreateDbContext();
+
+        employees = await db.Employees
             .OrderByDescending(e => e.HireDate)
             .ToListAsync();
     }
 
     private async Task Add()
     {
+        Console.WriteLine($"Adding employee: {employee.Name}, Group: {employee.Group}, HireDate: {employee.HireDate}, ExperienceMonth: {employee.ExperienceMonth}");
         try
         {
             if (string.IsNullOrWhiteSpace(employee.Name))
@@ -93,20 +96,28 @@ else
                 return;
             }
 
-            Db.Employees.Add(employee);
-            await Db.SaveChangesAsync();
+            using var db = DbFactory.CreateDbContext();
 
-            message = $"Mitarbeiter '{employee.Name}' gespeichert!";
+            var toSave = new Employee
+            {
+                Name = employee.Name,
+                Group = employee.Group,
+                HireDate = employee.HireDate,
+                ExperienceMonth = employee.ExperienceMonth
+            };
 
-            await LoadEmployees();
+            db.Employees.Add(toSave);
+            await db.SaveChangesAsync();
+
+            message = $"Mitarbeiter '{toSave.Name}' gespeichert!";
+
+            employees.Insert(0, toSave);
 
             employee = new Employee { HireDate = DateTime.Today };
-
-            StateHasChanged();
         }
         catch (Exception ex)
         {
-            message = "Fehler beim Speichern: " + ex.Message;
+            message = ex.ToString(); // wichtig zum Debuggen!
         }
     }
 

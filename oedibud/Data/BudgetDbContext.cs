@@ -3,7 +3,12 @@ using oedibud.Models;
 
 namespace oedibud.Data;
 
-public class BudgetDbContext(DbContextOptions options) : DbContext(options)
+public class BudgetDbContext : DbContext
 {
-    public DbSet<Employee> Employees => Set<Employee>();
+    public BudgetDbContext(DbContextOptions<BudgetDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<Employee> Employees { get; set; } = null!;
 }
