@@ -69,7 +69,7 @@ else
                                 {
                                     <table class="table table-sm">
                                         <thead>
-                                            <tr><th>Date</th><th>Amount</th><th></th></tr>
+                                            <tr><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
                                         </thead>
                                         <tbody>
                                             @foreach (var pay in p.Payments.OrderByDescending(x => x.Date))
@@ -77,6 +77,7 @@ else
                                                 <tr>
                                                     <td>@pay.Date.ToShortDateString()</td>
                                                     <td>@pay.Amount.ToString("C")</td>
+                                                    <td>@pay.DetecatedTo.ToString()</td>
                                                     <td>
                                                         <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Zahlung löschen</button>
                                                     </td>
@@ -96,6 +97,16 @@ else
                                         <div class="col-auto">
                                             <label class="form-label">Betrag</label>
                                             <input type="number" step="0.01" class="form-control" @bind="paymentInputs[p.Id].Amount" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label>">Gewidmet</label>
+                                            <select class="form-control" @bind="paymentInputs[p.Id].DetecatedTo">
+                                                <option value="">-- keine Angabe --</option>
+                                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                                {
+                                                    <option value="@g">@g</option>
+                                                }
+                                            </select>
                                         </div>
                                         <div class="col-auto">
                                             <button class="btn btn-success" @onclick="() => AddPayment(p)">Hinzufügen</button>
@@ -128,12 +139,14 @@ else
     {
         public DateTime Date { get; set; }
         public decimal Amount { get; set; }
+        public EmployeeGroup? DetecatedTo { get; set; }
 
         public PaymentInput() { }
-        public PaymentInput(DateTime date, decimal amount)
+        public PaymentInput(DateTime date, decimal amount, EmployeeGroup? dedicatedTo)
         {
             Date = date;
             Amount = amount;
+            DetecatedTo = dedicatedTo;
         }
     }
     private Dictionary<int, PaymentInput> paymentInputs = new();
@@ -152,7 +165,7 @@ else
             .ToListAsync();
 
         // ensure paymentInputs entries exist
-        paymentInputs = projects.ToDictionary(p => p.Id, p => new PaymentInput(DateTime.Today, 0m));
+        paymentInputs = projects.ToDictionary(p => p.Id, p => new PaymentInput(DateTime.Today, 0m, null));
     }
 
     private void ToggleExpand(int projectId)
@@ -161,7 +174,7 @@ else
         {
             expanded.Add(projectId);
             if (!paymentInputs.ContainsKey(projectId))
-                paymentInputs[projectId] = new PaymentInput(DateTime.Today, 0m);
+                paymentInputs[projectId] = new PaymentInput(DateTime.Today, 0m, null);
         }
     }
 
@@ -184,7 +197,7 @@ else
             // load payments navigation empty
             project.Payments = new List<Payment>();
             projects.Insert(0, project);
-            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m);
+            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m, null);
             // newProjectTitle = "";
             message = $"Projekt '{project.Title}' hinzugefügt.";
             project = new()
@@ -214,7 +227,8 @@ else
         {
             ProjectId = project.Id,
             Date = input.Date,
-            Amount = input.Amount
+            Amount = input.Amount,
+            DetecatedTo = input.DetecatedTo
         };
 
         try
@@ -231,7 +245,7 @@ else
             }
 
             // reset input
-            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m);
+            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m, null);
             message = "Zahlung hinzugefügt.";
             StateHasChanged();
         }

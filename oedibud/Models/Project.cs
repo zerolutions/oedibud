@@ -28,6 +28,7 @@ namespace oedibud.Models
         public Project? Project { get; set; }
 
         public DateTime Date { get; set; } = DateTime.Today;
+        public EmployeeGroup? DetecatedTo { get; set; } = null;
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal Amount { get; set; }
