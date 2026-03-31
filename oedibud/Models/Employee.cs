@@ -28,6 +28,9 @@ public class Employee
         }
     }
 
+    // navigation: payments assigned directly to this employee
+    public List<PaymentAssignment> PaymentAssignments { get; set; } = new();
+
     public DateTime NextLevel
     {
         get

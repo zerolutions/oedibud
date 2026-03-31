@@ -15,4 +15,6 @@ public class BudgetDbContext : DbContext
     public DbSet<Project> Projects { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<Contract> Contracts { get; set; }
+    public DbSet<ContractPayment> ContractPayments { get; set; }
+    public DbSet<PaymentAssignment> PaymentAssignments { get; set; }
 }

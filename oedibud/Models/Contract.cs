@@ -14,6 +14,9 @@ public class Contract
     public DateTime End { get; set; }
     public float Fte { get; set; }
 
+    // Navigation: payments assigned to this contract (many-to-many via ContractPayment)
+    public List<ContractPayment> Payments { get; set; } = new();
+
     //public decimal GetSalleryAtSpecificMonth(int year, int month)
     //{
     //    var date = new DateTime(year, month, 1);

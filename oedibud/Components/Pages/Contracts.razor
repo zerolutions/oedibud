@@ -64,9 +64,77 @@ else
                     <td>@c.End.ToShortDateString()</td>
                     <td>@c.Fte</td>
                     <td>
-                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteContract(c.Id)">Löschen</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "-" : "+")</button>
+                        <button class="btn btn-danger btn-sm ms-2" @onclick="() => DeleteContract(c.Id)">Löschen</button>
                     </td>
                 </tr>
+                @if (expanded.Contains(c.Id))
+                {
+                    <tr>
+                        <td colspan="6" class="p-0">
+                            <div class="p-3">
+                                <h6>Zugeordnete Zahlungen</h6>
+                                @if (c.Payments == null || c.Payments.Count == 0)
+                                {
+                                    <div><em>Keine Zahlungen zugeordnet</em></div>
+                                }
+                                else
+                                {
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var cp in c.Payments.OrderByDescending(x => x.Payment?.Date))
+                                            {
+                                                <tr>
+                                                    <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
+                                                    <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
+                                                    <td>@cp.SharePercent</td>
+                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                    <td><button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, c.Id)">Entfernen</button></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+
+                                <div class="border-top pt-2 mt-2">
+                                    <h6>Zahlung hinzufügen</h6>
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-auto">
+                                            <label class="form-label">Zahlung</label>
+                                            <select class="form-control" @bind="paymentInputs[c.Id].PaymentId">
+                                                <option value="0">-- auswählen --</option>
+                                                @foreach (var p in AvailablePaymentsForContract(c))
+                                                {
+                                                    <option value="@p.Id">@($"{p.Date.ToShortDateString()} - {p.Amount.ToString("C")}")</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Anteil %</label>
+                                            <input type="number" class="form-control" min="0" max="100" @bind="paymentInputs[c.Id].SharePercent" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Von</label>
+                                            <input type="date" class="form-control" @bind="paymentInputs[c.Id].Start" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Bis</label>
+                                            <input type="date" class="form-control" @bind="paymentInputs[c.Id].End" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <button class="btn btn-success" @onclick="() => AddContractPayment(c)">Hinzufügen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
@@ -76,7 +144,21 @@ else
     private Contract newContract = new Contract { Start = DateTime.Today, End = DateTime.Today.AddMonths(1), Fte = 1.0f };
     private List<Employee> employees = new();
     private List<Contract> contracts = new();
+    private List<Payment> payments = new();
     private string message = string.Empty;
+
+    // UI helpers
+    private HashSet<int> expanded = new();
+
+    private class ContractPaymentInput
+    {
+        public int PaymentId { get; set; }
+        public int SharePercent { get; set; } = 100;
+        public DateTime? Start { get; set; }
+        public DateTime? End { get; set; }
+    }
+
+    private Dictionary<int, ContractPaymentInput> paymentInputs = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -87,7 +169,98 @@ else
     {
         using var db = DbFactory.CreateDbContext();
         employees = await db.Employees.OrderBy(e => e.Name).ToListAsync();
-        contracts = await db.Contracts.Include(c => c.Employee).OrderByDescending(c => c.Start).ToListAsync();
+        payments = await db.Payments.OrderByDescending(p => p.Date).ToListAsync();
+        contracts = await db.Contracts
+            .Include(c => c.Employee)
+            .Include(c => c.Payments)
+                .ThenInclude(cp => cp.Payment)
+            .OrderByDescending(c => c.Start)
+            .ToListAsync();
+
+        paymentInputs = contracts.ToDictionary(c => c.Id, c => new ContractPaymentInput());
+    }
+
+    private IEnumerable<Payment> AvailablePaymentsForContract(Contract c)
+    {
+        // payments that match employee group or have no dedicated group and not already assigned to this contract
+        var empGroup = c.Employee?.Group;
+        var assignedIds = c.Payments?.Select(x => x.PaymentId).ToHashSet() ?? new HashSet<int>();
+        return payments.Where(p => !assignedIds.Contains(p.Id) && (p.DetecatedTo == null || (empGroup != null && p.DetecatedTo == empGroup)));
+    }
+
+    private void ToggleExpand(int id)
+    {
+        if (!expanded.Remove(id))
+        {
+            expanded.Add(id);
+            if (!paymentInputs.ContainsKey(id)) paymentInputs[id] = new ContractPaymentInput();
+        }
+    }
+
+    private async Task AddContractPayment(Contract c)
+    {
+        if (!paymentInputs.TryGetValue(c.Id, out var input)) return;
+        if (input.PaymentId == 0)
+        {
+            message = "Bitte eine Zahlung auswählen.";
+            return;
+        }
+        if (input.SharePercent < 0 || input.SharePercent > 100)
+        {
+            message = "Anteil muss zwischen 0 und 100 liegen.";
+            return;
+        }
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var cp = new ContractPayment
+            {
+                ContractId = c.Id,
+                PaymentId = input.PaymentId,
+                SharePercent = input.SharePercent,
+                Start = input.Start,
+                End = input.End
+            };
+            db.Add(cp);
+            await db.SaveChangesAsync();
+
+            // update local model
+            var loaded = await db.ContractPayments.Include(x => x.Payment).FirstOrDefaultAsync(x => x.Id == cp.Id);
+            if (loaded != null)
+            {
+                var target = contracts.FirstOrDefault(x => x.Id == c.Id);
+                if (target != null) target.Payments.Add(loaded);
+            }
+
+            message = "Zahlung zugewiesen.";
+            paymentInputs[c.Id] = new ContractPaymentInput();
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private async Task DeleteContractPayment(int contractPaymentId, int contractId)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var item = await db.ContractPayments.FindAsync(contractPaymentId);
+            if (item != null)
+            {
+                db.ContractPayments.Remove(item);
+                await db.SaveChangesAsync();
+                var target = contracts.FirstOrDefault(c => c.Id == contractId);
+                if (target != null) target.Payments.RemoveAll(x => x.Id == contractPaymentId);
+                message = "Zuweisung entfernt.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
     }
 
     private async Task AddContract()

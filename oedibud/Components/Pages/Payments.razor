@@ -1,0 +1,221 @@
+@page "/payments"
+
+@using Microsoft.EntityFrameworkCore
+@using oedibud.Models
+@using oedibud.Data
+@inject IDbContextFactory<BudgetDbContext> DbFactory
+
+<h3>Zahlungen</h3>
+
+@if (payments.Count == 0)
+{
+    <p>Keine Zahlungen vorhanden.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Id</th><th>Datum</th><th>Betrag</th><th>Projekt</th><th>Gewidmet</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var p in payments)
+            {
+                <tr>
+                    <td>@p.Id</td>
+                    <td>@p.Date.ToShortDateString()</td>
+                    <td>@p.Amount.ToString("C")</td>
+                    <td>@(p.Project?.Title ?? "-")</td>
+                    <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "-" : "+")</button>
+                    </td>
+                </tr>
+                @if (expanded.Contains(p.Id))
+                {
+                    <tr>
+                        <td colspan="6" class="p-0">
+                            <div class="p-3">
+                                <h6>Zugeordnete Verträge</h6>
+                                @if (p.ContractAssignments == null || p.ContractAssignments.Count == 0)
+                                {
+                                    <div><em>Keine Zuordnungen</em></div>
+                                }
+                                else
+                                {
+                                    <table class="table table-sm">
+                                        <thead><tr><th>Vertrag</th><th>Mitarbeiter</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+                                        <tbody>
+                                            @foreach (var cp in p.ContractAssignments.OrderByDescending(x => x.SharePercent))
+                                            {
+                                                <tr>
+                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
+                                                    <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    <td>@cp.SharePercent</td>
+                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                    <td><button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, p.Id)">Entfernen</button></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+
+                                <div class="border-top pt-2 mt-2">
+                                    <h6>Vertrag zuweisen</h6>
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-auto">
+                                            <label class="form-label">Vertrag</label>
+                                            <select class="form-control" @bind="contractInputs[p.Id].ContractId">
+                                                <option value="0">-- auswählen --</option>
+                                                @foreach (var c in AvailableContractsForPayment(p))
+                                                {
+                                                    <option value="@c.Id">@($"{c.Id} - {c.Employee?.Name ?? "-"} ({c.Start.ToShortDateString()} - {c.End.ToShortDateString()})")</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Anteil %</label>
+                                            <input type="number" class="form-control" min="0" max="100" @bind="contractInputs[p.Id].SharePercent" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Von</label>
+                                            <input type="date" class="form-control" @bind="contractInputs[p.Id].Start" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Bis</label>
+                                            <input type="date" class="form-control" @bind="contractInputs[p.Id].End" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <button class="btn btn-success" @onclick="() => AddContractAssignment(p)">Zuweisen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Payment> payments = new();
+    private List<Contract> contracts = new();
+    private HashSet<int> expanded = new();
+    private string message = string.Empty;
+
+    private class ContractAssignInput
+    {
+        public int ContractId { get; set; }
+        public int SharePercent { get; set; } = 100;
+        public DateTime? Start { get; set; }
+        public DateTime? End { get; set; }
+    }
+
+    private Dictionary<int, ContractAssignInput> contractInputs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        using var db = DbFactory.CreateDbContext();
+        // load contracts with employee navigation
+        contracts = await db.Contracts.Include(c => c.Employee).OrderByDescending(c => c.Start).ToListAsync();
+
+        // load payments including existing contract assignments and contract->employee
+        payments = await db.Payments
+            .Include(p => p.Project)
+            .Include(p => p.ContractAssignments)
+                .ThenInclude(cp => cp.Contract)
+                    .ThenInclude(c => c.Employee)
+            .OrderByDescending(p => p.Date)
+            .ToListAsync();
+
+        contractInputs = payments.ToDictionary(p => p.Id, p => new ContractAssignInput());
+    }
+
+    private IEnumerable<Contract> AvailableContractsForPayment(Payment p)
+    {
+        var paymentGroup = p.DetecatedTo;
+        var assignedIds = p.ContractAssignments?.Select(x => x.ContractId).ToHashSet() ?? new HashSet<int>();
+        return contracts.Where(c => !assignedIds.Contains(c.Id) && (paymentGroup == null || (c.Employee != null && c.Employee.Group == paymentGroup)));
+    }
+
+    private void ToggleExpand(int id)
+    {
+        if (!expanded.Remove(id))
+        {
+            expanded.Add(id);
+            if (!contractInputs.ContainsKey(id)) contractInputs[id] = new ContractAssignInput();
+        }
+    }
+
+    private async Task AddContractAssignment(Payment p)
+    {
+        if (!contractInputs.TryGetValue(p.Id, out var input)) return;
+        if (input.ContractId == 0)
+        {
+            message = "Bitte einen Vertrag auswählen.";
+            return;
+        }
+        if (input.SharePercent < 0 || input.SharePercent > 100)
+        {
+            message = "Anteil muss zwischen 0 und 100 liegen.";
+            return;
+        }
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var cp = new ContractPayment
+            {
+                PaymentId = p.Id,
+                ContractId = input.ContractId,
+                SharePercent = input.SharePercent,
+                Start = input.Start,
+                End = input.End
+            };
+            db.Add(cp);
+            await db.SaveChangesAsync();
+
+            var loaded = await db.ContractPayments.Include(x => x.Contract).ThenInclude(c => c.Employee).FirstOrDefaultAsync(x => x.Id == cp.Id);
+            if (loaded != null)
+            {
+                var target = payments.FirstOrDefault(x => x.Id == p.Id);
+                if (target != null) target.ContractAssignments.Add(loaded);
+            }
+
+            message = "Vertrag zugewiesen.";
+            contractInputs[p.Id] = new ContractAssignInput();
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private async Task DeleteContractAssignment(int contractPaymentId, int paymentId)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var item = await db.ContractPayments.FindAsync(contractPaymentId);
+            if (item != null)
+            {
+                db.ContractPayments.Remove(item);
+                await db.SaveChangesAsync();
+                var target = payments.FirstOrDefault(x => x.Id == paymentId);
+                if (target != null) target.ContractAssignments.RemoveAll(x => x.Id == contractPaymentId);
+                message = "Zuweisung entfernt.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+}

@@ -32,5 +32,11 @@ namespace oedibud.Models
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal Amount { get; set; }
+        
+        // Navigation: assignments to contracts (many-to-many with extra fields)
+        public List<ContractPayment> ContractAssignments { get; set; } = new();
+
+        // Navigation: assignments to employees (many-to-many with extra fields)
+        public List<PaymentAssignment> EmployeeAssignments { get; set; } = new();
     }
 }
