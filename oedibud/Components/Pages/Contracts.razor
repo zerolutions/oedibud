@@ -1,0 +1,152 @@
+﻿@page "/contracts"
+
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using oedibud.Models
+@using oedibud.Data
+@inject IDbContextFactory<BudgetDbContext> DbFactory
+
+<h3>Verträge</h3>
+
+<div class="mb-3">
+    <label>Mitarbeiter</label>
+    <select class="form-control mb-2" @bind="newContract.EmployeeId">
+        <option value="0">-- auswählen --</option>
+        @foreach (var e in employees)
+        {
+            <option value="@e.Id">@e.Name</option>
+        }
+    </select>
+
+    <label>Start</label>
+    <InputDate class="form-control mb-2" @bind-Value="newContract.Start" />
+
+    <label>Ende</label>
+    <InputDate class="form-control mb-2" @bind-Value="newContract.End" />
+
+    <label>FTE</label>
+    <input type="number" step="0.01" class="form-control mb-2" @bind="newContract.Fte" />
+
+    <button class="btn btn-primary" @onclick="AddContract">Vertrag hinzufügen</button>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-info">@message</div>
+}
+
+<hr />
+
+@if (contracts.Count == 0)
+{
+    <p>Keine Verträge vorhanden.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Mitarbeiter</th>
+                <th>Start</th>
+                <th>Ende</th>
+                <th>FTE</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in contracts)
+            {
+                <tr>
+                    <td>@c.Id</td>
+                    <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
+                    <td>@c.Start.ToShortDateString()</td>
+                    <td>@c.End.ToShortDateString()</td>
+                    <td>@c.Fte</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteContract(c.Id)">Löschen</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private Contract newContract = new Contract { Start = DateTime.Today, End = DateTime.Today.AddMonths(1), Fte = 1.0f };
+    private List<Employee> employees = new();
+    private List<Contract> contracts = new();
+    private string message = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        using var db = DbFactory.CreateDbContext();
+        employees = await db.Employees.OrderBy(e => e.Name).ToListAsync();
+        contracts = await db.Contracts.Include(c => c.Employee).OrderByDescending(c => c.Start).ToListAsync();
+    }
+
+    private async Task AddContract()
+    {
+        if (newContract.EmployeeId == 0)
+        {
+            message = "Bitte einen Mitarbeiter auswählen.";
+            return;
+        }
+        if (newContract.End < newContract.Start)
+        {
+            message = "Ende darf nicht vor dem Start liegen.";
+            return;
+        }
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var toSave = new Contract
+            {
+                EmployeeId = newContract.EmployeeId,
+                Start = newContract.Start,
+                End = newContract.End,
+                Fte = newContract.Fte
+            };
+
+            db.Contracts.Add(toSave);
+            await db.SaveChangesAsync();
+
+            // reload saved contract with navigation
+            var saved = await db.Contracts.Include(c => c.Employee).FirstOrDefaultAsync(c => c.Id == toSave.Id);
+            if (saved != null) contracts.Insert(0, saved);
+
+            message = "Vertrag gespeichert.";
+            newContract = new Contract { Start = DateTime.Today, End = DateTime.Today.AddMonths(1), Fte = 1.0f };
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private async Task DeleteContract(int id)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var item = await db.Contracts.FindAsync(id);
+            if (item != null)
+            {
+                db.Contracts.Remove(item);
+                await db.SaveChangesAsync();
+                contracts.RemoveAll(c => c.Id == id);
+                message = "Vertrag gelöscht.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+}

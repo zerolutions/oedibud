@@ -14,4 +14,5 @@ public class BudgetDbContext : DbContext
     // inside your existing BudgetDbContext class:
     public DbSet<Project> Projects { get; set; }
     public DbSet<Payment> Payments { get; set; }
+    public DbSet<Contract> Contracts { get; set; }
 }
