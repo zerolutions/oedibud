@@ -35,8 +35,10 @@ public class TvLSalaryService
         while (!reader.EndOfStream)
         {
             var line = reader.ReadLine();
+            if (string.IsNullOrWhiteSpace(line)) continue;
 
             var parts = line.Split(';');
+            if (parts.Length < 2) continue;
 
             var group = parts[0].Trim();
 
@@ -44,18 +46,37 @@ public class TvLSalaryService
 
             for (int i = 1; i < parts.Length; i++)
             {
-                if (decimal.TryParse(
-                    parts[i],
-                    NumberStyles.Any,
-                    CultureInfo.InvariantCulture,
-                    out var salary))
+                var token = parts[i].Trim();
+                if (string.IsNullOrEmpty(token)) continue;
+
+                // try several parse strategies to tolerate comma as decimal separator
+                if (!decimal.TryParse(token, NumberStyles.Any, CultureInfo.InvariantCulture, out var salary))
+                {
+                    if (!decimal.TryParse(token, NumberStyles.Any, CultureInfo.GetCultureInfo("de-DE"), out salary))
+                    {
+                        // fallback: replace comma with dot
+                        var alt = token.Replace(',', '.');
+                        decimal.TryParse(alt, NumberStyles.Any, CultureInfo.InvariantCulture, out salary);
+                    }
+                }
+
+                if (salary != 0)
                 {
                     dict[i] = salary;
                 }
             }
 
-            _data[group] = dict;
+            // store with normalized key (remove spaces, to upper) to make lookup robust
+            _data[NormalizeKey(group)] = dict;
         }
+    }
+
+    private static string NormalizeKey(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+        // remove spaces and control chars, normalize to uppercase
+        var chars = s.Where(c => !char.IsWhiteSpace(c)).ToArray();
+        return new string(chars).ToUpperInvariant();
     }
 
     public decimal GetSalary(EmployeeGroup group, int level)
@@ -64,7 +85,16 @@ public class TvLSalaryService
         var member = typeof(EmployeeGroup).GetMember(group.ToString()).FirstOrDefault();
         var displayName = member?.GetCustomAttribute<DisplayAttribute>()?.Name ?? group.ToString();
 
-        if (_data.TryGetValue(displayName, out var levels))
+        // try normalized lookup first
+        var key = NormalizeKey(displayName);
+        if (_data.TryGetValue(key, out var levels))
+        {
+            if (levels.TryGetValue(level, out var salary))
+                return salary;
+        }
+
+        // fallback: try original displayName as-is
+        if (_data.TryGetValue(displayName, out levels))
         {
             if (levels.TryGetValue(level, out var salary))
                 return salary;

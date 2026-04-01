@@ -15,6 +15,7 @@ builder.Services.AddDbContextFactory<BudgetDbContext>(options =>
     options.UseSqlite("Data Source=oedibud.db"));
 
 builder.Services.AddSingleton<TvLSalaryService>();
+builder.Services.AddSingleton<DataChangeNotifier>();
 
 builder.Services.AddScoped<ForecastService>();
 

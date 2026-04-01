@@ -28,8 +28,7 @@ public class Employee
         }
     }
 
-    // navigation: payments assigned directly to this employee
-    public List<PaymentAssignment> PaymentAssignments { get; set; } = new();
+    // navigation: (PaymentAssignment removed - direct employee assignments are not supported)
 
     public DateTime NextLevel
     {

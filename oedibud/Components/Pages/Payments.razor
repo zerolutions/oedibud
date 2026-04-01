@@ -4,6 +4,7 @@
 @using oedibud.Models
 @using oedibud.Data
 @inject IDbContextFactory<BudgetDbContext> DbFactory
+@inject oedibud.Services.DataChangeNotifier Notifier
 
 <h3>Zahlungen</h3>
 
@@ -191,6 +192,7 @@ else
 
             message = "Vertrag zugewiesen.";
             contractInputs[p.Id] = new ContractAssignInput();
+            Notifier.Notify();
         }
         catch (Exception ex)
         {
@@ -211,6 +213,7 @@ else
                 var target = payments.FirstOrDefault(x => x.Id == paymentId);
                 if (target != null) target.ContractAssignments.RemoveAll(x => x.Id == contractPaymentId);
                 message = "Zuweisung entfernt.";
+                    Notifier.Notify();
             }
         }
         catch (Exception ex)

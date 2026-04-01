@@ -1,0 +1,287 @@
+@using oedibud.Data
+@using oedibud.Models
+@using oedibud.Services
+@using Microsoft.EntityFrameworkCore
+@using System.Linq
+@inject BudgetDbContext Db
+@inject TvLSalaryService TvL
+@inject oedibud.Services.DataChangeNotifier Notifier
+
+@code {
+    private int Months = 12;
+    private DateTime StartMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+    private List<DateTime> Columns = new();
+
+    private class RowItem
+    {
+        public enum RowType { Employee, Contract, ContractPayment }
+        public RowType Type { get; set; }
+        public int EmployeeId { get; set; }
+        public int? ContractId { get; set; }
+        public string Label { get; set; } = "";
+        public decimal[] Values { get; set; } = Array.Empty<decimal>();
+    }
+
+    private List<RowItem> Rows = new();
+    private HashSet<int> Expanded = new();
+    private decimal[] Totals = Array.Empty<decimal>();
+    private Dictionary<int, Dictionary<int, decimal[]>>? _perContractPaymentAlloc = null;
+
+    private Action? _onChangeHandler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _onChangeHandler = () => _ = InvokeAsync(LoadDataAsync);
+        Notifier.OnChange += _onChangeHandler;
+        for (int i = 0; i < Months; i++)
+            Columns.Add(StartMonth.AddMonths(i));
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        // load data
+        var employees = await Db.Employees.ToListAsync();
+        var contracts = await Db.Contracts
+            .Include(c => c.Payments)
+                .ThenInclude(cp => cp.Payment)
+            .ToListAsync();
+
+        // build rows
+        Rows.Clear();
+
+        foreach (var emp in employees.OrderBy(e => e.Name))
+        {
+            var empRow = new RowItem
+            {
+                Type = RowItem.RowType.Employee,
+                EmployeeId = emp.Id,
+                Label = emp.Name,
+                Values = new decimal[Months]
+            };
+
+            // find contracts for employee that overlap the period
+            var empContracts = contracts.Where(c => c.EmployeeId == emp.Id && c.End >= Columns.First() && c.Start <= Columns.Last()).ToList();
+
+            // compute per month contract cost and payments
+            var contractMonthValues = new Dictionary<int, decimal[]>();
+            _perContractPaymentAlloc ??= new Dictionary<int, Dictionary<int, decimal[]>>();
+
+            foreach (var c in empContracts)
+            {
+                // positive monthly cost per month
+                var monthlyCost = new decimal[Months];
+                for (int m = 0; m < Months; m++)
+                {
+                    var month = Columns[m];
+                    if (month < new DateTime(c.Start.Year, c.Start.Month, 1) || month > new DateTime(c.End.Year, c.End.Month, 1))
+                        continue;
+
+                    int level = CalculateLevelAt(emp, month);
+                    var sal = TvL.GetSalary(emp.Group, level);
+                    monthlyCost[m] = sal * (decimal)c.Fte;
+                }
+
+                var paymentsAssigned = new decimal[Months];
+                var perPaymentAlloc = new Dictionary<int, decimal[]>();
+
+                // allocate each contract payment greedily starting at cp.Start (or payment date)
+                foreach (var cp in c.Payments)
+                {
+                    var p = cp.Payment;
+                    if (p == null) continue;
+
+                    var alloc = new decimal[Months];
+
+                    var rawStart = cp.Start ?? p.Date;
+                    var start = rawStart < p.Date ? p.Date : rawStart;
+                    var end = cp.End ?? c.End;
+
+                    var startMonth = new DateTime(start.Year, start.Month, 1);
+                    var endMonth = new DateTime(end.Year, end.Month, 1);
+
+                    if (startMonth > endMonth)
+                    {
+                        perPaymentAlloc[cp.Id] = alloc;
+                        continue;
+                    }
+
+                    var remaining = (p.Amount * cp.SharePercent) / 100m;
+
+                    for (int m = 0; m < Months && remaining > 0; m++)
+                    {
+                        var month = Columns[m];
+                        var monthStart = new DateTime(month.Year, month.Month, 1);
+                        if (monthStart < startMonth || monthStart > endMonth) continue;
+                        if (monthStart < new DateTime(p.Date.Year, p.Date.Month, 1)) continue;
+
+                        var need = monthlyCost[m] - paymentsAssigned[m];
+                        if (need <= 0) continue;
+
+                        var take = Math.Min(need, remaining);
+                        paymentsAssigned[m] += take;
+                        alloc[m] += take;
+                        remaining -= take;
+                    }
+
+                    perPaymentAlloc[cp.Id] = alloc;
+                }
+
+                // contract row = negative costs + assigned payments
+                var arr = new decimal[Months];
+                for (int m = 0; m < Months; m++)
+                    arr[m] = -monthlyCost[m] + paymentsAssigned[m];
+
+                contractMonthValues[c.Id] = arr;
+                _perContractPaymentAlloc[c.Id] = perPaymentAlloc;
+            }
+
+            // fill employee totals as saldiert (netto): sum of contract rows (which already contain negative costs + assigned payments)
+            for (int m = 0; m < Months; m++)
+            {
+                empRow.Values[m] = contractMonthValues.Values.Sum(a => a[m]);
+            }
+
+            Rows.Add(empRow);
+
+            // add contract rows and their payment rows as children (initially collapsed)
+            foreach (var c in empContracts)
+            {
+                var crow = new RowItem
+                {
+                    Type = RowItem.RowType.Contract,
+                    EmployeeId = emp.Id,
+                    ContractId = c.Id,
+                    Label = $"Contract {c.Id} ({c.Start:yyyy-MM} - {c.End:yyyy-MM})",
+                    Values = contractMonthValues[c.Id]
+                };
+
+                Rows.Add(crow);
+
+                // add payment rows (show per-contract allocations computed earlier)
+                foreach (var cp in c.Payments)
+                {
+                    var p = cp.Payment;
+                    if (p == null) continue;
+
+                    decimal[] allocValues = new decimal[Months];
+                    if (_perContractPaymentAlloc != null && _perContractPaymentAlloc.TryGetValue(c.Id, out var dict) && dict.TryGetValue(cp.Id, out var cpAlloc))
+                        allocValues = cpAlloc;
+
+                    Rows.Add(new RowItem
+                    {
+                        Type = RowItem.RowType.ContractPayment,
+                        EmployeeId = emp.Id,
+                        ContractId = c.Id,
+                        Label = $"Payment {p.Id} ({p.Date:yyyy-MM}) - {p.Amount:C}",
+                        Values = allocValues
+                    });
+                }
+            }
+        }
+
+        // compute grand totals (sum of employee rows)
+        Totals = new decimal[Months];
+        foreach (var er in Rows.Where(r => r.Type == RowItem.RowType.Employee))
+        {
+            for (int m = 0; m < Months; m++)
+                Totals[m] += er.Values[m];
+        }
+    }
+
+    private int CalculateLevelAt(Employee emp, DateTime date)
+    {
+        int[] LevelThresholds = { 0, 12, 36, 72, 120, 180 };
+        int monthsSinceHire = (date.Year - emp.HireDate.Year) * 12 + (date.Month - emp.HireDate.Month) + emp.ExperienceMonth;
+
+        for (int lvl = LevelThresholds.Length; lvl >= 1; lvl--)
+        {
+            int threshold = LevelThresholds[Math.Max(0, lvl - 1)];
+            if (monthsSinceHire >= threshold) return Math.Min(lvl, LevelThresholds.Length);
+        }
+        return 1;
+    }
+
+    private void Toggle(int empId)
+    {
+        if (Expanded.Contains(empId)) Expanded.Remove(empId);
+        else Expanded.Add(empId);
+    }
+}
+
+@implements IDisposable
+
+@code {
+    void IDisposable.Dispose()
+    {
+        if (_onChangeHandler != null)
+            Notifier.OnChange -= _onChangeHandler;
+    }
+}
+
+<h3>Prognose (nächste @Months Monate)</h3>
+
+<table class="table table-sm table-bordered">
+    <thead>
+        <tr>
+            <th>Person / Vertrag / Zahlung</th>
+            @foreach (var col in Columns)
+            {
+                <th>@col.ToString("MM/yyyy")</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var row in Rows)
+        {
+            if (row.Type == RowItem.RowType.Employee)
+            {
+                <tr class="table-primary">
+                    <td>
+                        <button class="btn btn-link" @onclick="() => Toggle(row.EmployeeId)">
+                            @(Expanded.Contains(row.EmployeeId) ? "-" : "+")
+                        </button>
+                        @row.Label
+                    </td>
+                    @for (int i = 0; i < row.Values.Length; i++)
+                    {
+                        <td>@row.Values[i].ToString("C")</td>
+                    }
+                </tr>
+            }
+            else if (row.Type == RowItem.RowType.Contract)
+            {
+                if (!Expanded.Contains(row.EmployeeId)) { continue; }
+                <tr class="table-secondary">
+                    <td style="padding-left:20px">@row.Label</td>
+                    @for (int i = 0; i < row.Values.Length; i++)
+                    {
+                        <td>@row.Values[i].ToString("C")</td>
+                    }
+                </tr>
+            }
+            else if (row.Type == RowItem.RowType.ContractPayment)
+            {
+                if (!Expanded.Contains(row.EmployeeId)) { continue; }
+                <tr class="table-success">
+                    <td style="padding-left:40px">@row.Label</td>
+                    @for (int i = 0; i < row.Values.Length; i++)
+                    {
+                        <td>@row.Values[i].ToString("C")</td>
+                    }
+                </tr>
+            }
+        }
+    </tbody>
+    <tfoot>
+        <tr class="table-dark">
+            <td>Gesamt</td>
+            @for (int i = 0; i < Totals.Length; i++)
+            {
+                <td>@Totals[i].ToString("C")</td>
+            }
+        </tr>
+    </tfoot>
+</table>

@@ -8,11 +8,13 @@
 
 <h3>Budget Forecast</h3>
 
-<Blazorise.Charts.LineChart TItem="double?" @ref="chart" />
+@* <Blazorise.Charts.LineChart TItem="double?" @ref="chart" /> *@
+
+<ForecastTable />
 
 @code {
 
-    private Blazorise.Charts.LineChart<double?> chart = default!;
+    /*private Blazorise.Charts.LineChart<double?> chart = default!;
     private Blazorise.Charts.LineChartOptions lineChartOptions = default!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -35,5 +37,5 @@
 
             // await chart.AddLabelsDatasetsAndUpdate(labels, new IChartDataset[] { dataset });
         }
-    }
+    }*/
 }
