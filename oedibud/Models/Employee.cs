@@ -10,6 +10,7 @@ public class Employee
     public EmployeeGroup Group { get; set; } = EmployeeGroup.E13;
     public DateTime HireDate { get; set; }
     public int ExperienceMonth { get; set; }
+    public decimal BruttoFactor { get; set; }
 
     public int Level
     {

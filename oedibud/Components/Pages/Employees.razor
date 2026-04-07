@@ -20,6 +20,7 @@
         }
     </select>
     Angerechnete Erfahrung (Monate):<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-1" />
+    Arbeitgeber Faktor:<input type="number" @bind="employee.BruttoFactor" class="form-control mb-1" />
     @* Erfahrung:<input type="number" @bind="employee.Level" class="form-control mb-1" /> *@
     <button type="button" class="btn btn-primary mt-2" @onclick="Add">Hinzufügen</button>
 </div>
@@ -48,6 +49,7 @@ else
                 <th>Eingestellt</th>
                 <th>Vorerfahrung (M.)</th>
                 <th>Nächste Stufe</th>
+                <th>Arbeitgeber Faktor</th>
                 <th></th>
                 <th></th>
             </tr>
@@ -72,6 +74,7 @@ else
                         <td><input type="date" class="form-control" @bind="editEmployeeCopies[e.Id].HireDate" /></td>
                         <td><input type="number" class="form-control" @bind="editEmployeeCopies[e.Id].ExperienceMonth" /></td>
                         <td>@e.NextLevel.ToShortDateString()</td>
+                        <td><input type="number" class="form-control" @bind="editEmployeeCopies[e.Id].BruttoFactor" /></td>
                         <td>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
                         </td>
@@ -88,6 +91,7 @@ else
                         <td>@e.HireDate.ToShortDateString()</td>
                         <td>@e.ExperienceMonth</td>
                         <td>@e.NextLevel.ToShortDateString()</td>
+                        <td>@e.BruttoFactor</td>
                         <td>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
                         </td>
@@ -175,7 +179,8 @@ else
 @code {
     private Employee employee = new()
     {
-        HireDate = DateTime.Today
+        HireDate = DateTime.Today,
+        BruttoFactor = 1.3M
     };
 
     private List<Employee> employees = new();
@@ -234,7 +239,8 @@ else
                 Name = employee.Name,
                 Group = employee.Group,
                 HireDate = employee.HireDate,
-                ExperienceMonth = employee.ExperienceMonth
+                ExperienceMonth = employee.ExperienceMonth,
+                BruttoFactor = employee.BruttoFactor
             };
 
             db.Employees.Add(toSave);
@@ -244,7 +250,7 @@ else
 
             employees.Insert(0, toSave);
 
-            employee = new Employee { HireDate = DateTime.Today };
+            employee = new Employee { HireDate = DateTime.Today, BruttoFactor = 1.3M };
         }
         catch (Exception ex)
         {
@@ -380,7 +386,8 @@ else
             Name = e.Name,
             Group = e.Group,
             HireDate = e.HireDate,
-            ExperienceMonth = e.ExperienceMonth
+            ExperienceMonth = e.ExperienceMonth,
+            BruttoFactor = e.BruttoFactor
         };
     }
 
@@ -397,6 +404,7 @@ else
                 dbItem.Group = copy.Group;
                 dbItem.HireDate = copy.HireDate;
                 dbItem.ExperienceMonth = copy.ExperienceMonth;
+                dbItem.BruttoFactor = copy.BruttoFactor;
                 await db.SaveChangesAsync();
 
                 // update local list
@@ -407,6 +415,7 @@ else
                     employees[idx].Group = dbItem.Group;
                     employees[idx].HireDate = dbItem.HireDate;
                     employees[idx].ExperienceMonth = dbItem.ExperienceMonth;
+                    employees[idx].BruttoFactor = dbItem.BruttoFactor;
                 }
                 message = "Mitarbeiter gespeichert.";
             }

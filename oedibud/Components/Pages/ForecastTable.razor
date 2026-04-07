@@ -148,8 +148,8 @@
                 var arr = new decimal[Months];
                 var arr2 = new decimal[Months];
                 for (int m = 0; m < Months; m++){
-                    arr[m] = -monthlyCost[m]; //+ paymentsAssigned[m];
-                    arr2[m] = -monthlyCost[m] + paymentsAssigned[m];
+                    arr[m] = -monthlyCost[m]*emp.BruttoFactor; //+ paymentsAssigned[m];
+                    arr2[m] = arr[m] + paymentsAssigned[m];
                 }
 
                 contractMonthValues[c.Id] = arr;
