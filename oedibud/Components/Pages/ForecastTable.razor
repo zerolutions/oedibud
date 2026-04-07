@@ -1,3 +1,4 @@
+@using Blazorise
 @using oedibud.Data
 @using oedibud.Models
 @using oedibud.Services
@@ -9,7 +10,17 @@
 
 @code {
     private int Months = 12;
-    private DateTime StartMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime StartMonth = new DateTime(DateTime.Today.Year, 1, 1);
+    public async Task NextYear()
+    {
+        StartMonth = StartMonth.AddMonths(12);
+        await OnInitializedAsync();
+    }
+    public async Task PrevYear()
+    {
+        StartMonth = StartMonth.AddMonths(-12);
+        await OnInitializedAsync();
+    }
 
     private List<DateTime> Columns = new();
 
@@ -32,8 +43,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+
+        Notifier.OnChange -= _onChangeHandler;
         _onChangeHandler = () => _ = InvokeAsync(LoadDataAsync);
         Notifier.OnChange += _onChangeHandler;
+        Columns = new();
         for (int i = 0; i < Months; i++)
             Columns.Add(StartMonth.AddMonths(i));
 
@@ -221,7 +235,9 @@
     }
 }
 
-<h3>Prognose (nächste @Months Monate)</h3>
+<h3>Prognose (@StartMonth.ToShortDateString() - @StartMonth.AddMonths(@Months).AddDays(-1).ToShortDateString())</h3>
+<button type="button" class="btn" @onclick="@PrevYear">zurück</button>
+<button type="button" class="btn" @onclick="@NextYear">weiter</button>
 
 <table class="table table-sm table-bordered">
     <thead>
