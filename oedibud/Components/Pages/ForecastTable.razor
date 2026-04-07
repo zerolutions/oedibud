@@ -47,7 +47,7 @@
         Notifier.OnChange -= _onChangeHandler;
         _onChangeHandler = () => _ = InvokeAsync(LoadDataAsync);
         Notifier.OnChange += _onChangeHandler;
-        Columns = new();
+        Columns.Clear();
         for (int i = 0; i < Months; i++)
             Columns.Add(StartMonth.AddMonths(i));
 
@@ -82,6 +82,7 @@
             // compute per month contract cost and payments
             var contractMonthValues = new Dictionary<int, decimal[]>();
             _perContractPaymentAlloc ??= new Dictionary<int, Dictionary<int, decimal[]>>();
+            var empMonthValues = new Dictionary<int, decimal[]>();
 
             foreach (var c in empContracts)
             {
@@ -93,7 +94,7 @@
                     if (month < new DateTime(c.Start.Year, c.Start.Month, 1) || month > new DateTime(c.End.Year, c.End.Month, 1))
                         continue;
 
-                    int level = CalculateLevelAt(emp, month);
+                    int level = emp.GetLevelAt(month);
                     var sal = TvL.GetSalary(emp.Group, level);
                     monthlyCost[m] = sal * (decimal)c.Fte;
                 }
@@ -145,17 +146,21 @@
 
                 // contract row = negative costs + assigned payments
                 var arr = new decimal[Months];
-                for (int m = 0; m < Months; m++)
-                    arr[m] = -monthlyCost[m] + paymentsAssigned[m];
+                var arr2 = new decimal[Months];
+                for (int m = 0; m < Months; m++){
+                    arr[m] = -monthlyCost[m]; //+ paymentsAssigned[m];
+                    arr2[m] = -monthlyCost[m] + paymentsAssigned[m];
+                }
 
                 contractMonthValues[c.Id] = arr;
+                empMonthValues[c.Id] = arr2;
                 _perContractPaymentAlloc[c.Id] = perPaymentAlloc;
             }
 
             // fill employee totals as saldiert (netto): sum of contract rows (which already contain negative costs + assigned payments)
             for (int m = 0; m < Months; m++)
             {
-                empRow.Values[m] = contractMonthValues.Values.Sum(a => a[m]);
+                empRow.Values[m] = empMonthValues.Values.Sum(a => a[m]);
             }
 
             Rows.Add(empRow);
@@ -203,19 +208,6 @@
             for (int m = 0; m < Months; m++)
                 Totals[m] += er.Values[m];
         }
-    }
-
-    private int CalculateLevelAt(Employee emp, DateTime date)
-    {
-        int[] LevelThresholds = { 0, 12, 36, 72, 120, 180 };
-        int monthsSinceHire = (date.Year - emp.HireDate.Year) * 12 + (date.Month - emp.HireDate.Month) + emp.ExperienceMonth;
-
-        for (int lvl = LevelThresholds.Length; lvl >= 1; lvl--)
-        {
-            int threshold = LevelThresholds[Math.Max(0, lvl - 1)];
-            if (monthsSinceHire >= threshold) return Math.Min(lvl, LevelThresholds.Length);
-        }
-        return 1;
     }
 
     private void Toggle(int empId)

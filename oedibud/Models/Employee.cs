@@ -50,5 +50,16 @@ public class Employee
         }
     }
 
+    public int GetLevelAt(DateTime date)
+    {
+        int monthsSinceHire = (date.Year - this.HireDate.Year) * 12 + (date.Month - this.HireDate.Month) + this.ExperienceMonth;
+
+        for (int lvl = LevelThresholds.Length; lvl >= 1; lvl--)
+        {
+            int threshold = LevelThresholds[Math.Max(0, lvl - 1)];
+            if (monthsSinceHire >= threshold) return Math.Min(lvl, LevelThresholds.Length);
+        }
+        return 1;
+    }
 
 }
