@@ -57,18 +57,45 @@ else
             {
                 <tr>
                     <td>@e.Id</td>
-                    <td>@e.Name</td>
-                    <td>@GetGroupName(e.Group)</td>
-                    <td>@e.Level</td>
-                    <td>@e.HireDate.ToShortDateString()</td>
-                    <td>@e.ExperienceMonth</td>
-                    <td>@e.NextLevel.ToShortDateString()</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-danger" @onclick="@(a => Delete(e))">Löschen</button>
-                    </td>
+                    @if (editingEmployeeId == e.Id)
+                    {
+                        <td><input class="form-control" @bind="editEmployeeCopies[e.Id].Name" /></td>
+                        <td>
+                            <select class="form-control" @bind="editEmployeeCopies[e.Id].Group">
+                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                {
+                                    <option value="@g">@GetGroupName(g)</option>
+                                }
+                            </select>
+                        </td>
+                        <td>@e.Level</td>
+                        <td><input type="date" class="form-control" @bind="editEmployeeCopies[e.Id].HireDate" /></td>
+                        <td><input type="number" class="form-control" @bind="editEmployeeCopies[e.Id].ExperienceMonth" /></td>
+                        <td>@e.NextLevel.ToShortDateString()</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
+                        </td>
+                    }
+                    else
+                    {
+                        <td>@e.Name</td>
+                        <td>@GetGroupName(e.Group)</td>
+                        <td>@e.Level</td>
+                        <td>@e.HireDate.ToShortDateString()</td>
+                        <td>@e.ExperienceMonth</td>
+                        <td>@e.NextLevel.ToShortDateString()</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-outline-primary btn-sm me-1" @onclick="() => EditEmployee(e)">Bearbeiten</button>
+                            <button type="button" class="btn btn-danger btn-sm" @onclick="@(a => Delete(e))">Löschen</button>
+                        </td>
+                    }
                 </tr>
 
                 @if (expanded.Contains(e.Id))
@@ -91,12 +118,26 @@ else
                                             @foreach (var c in contractsByEmployee[e.Id].OrderByDescending(c => c.Start))
                                             {
                                                 <tr>
-                                                    <td>@c.Start.ToShortDateString()</td>
-                                                    <td>@c.End.ToShortDateString()</td>
-                                                    <td>@c.Fte</td>
-                                                    <td>
-                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteContract(c.Id)">Löschen</button>
-                                                    </td>
+                                                    @if (editingContractIds.Contains(c.Id))
+                                                    {
+                                                        <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].Start" /></td>
+                                                        <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].End" /></td>
+                                                        <td><input type="number" step="0.01" class="form-control" @bind="editContractCopies[c.Id].Fte" /></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContract(c.Id)">Speichern</button>
+                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
+                                                        </td>
+                                                    }
+                                                    else
+                                                    {
+                                                        <td>@c.Start.ToShortDateString()</td>
+                                                        <td>@c.End.ToShortDateString()</td>
+                                                        <td>@c.Fte</td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContract(c)">Bearbeiten</button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteContract(c.Id)">Löschen</button>
+                                                        </td>
+                                                    }
                                                 </tr>
                                             }
                                         </tbody>
@@ -321,5 +362,127 @@ else
         {
             message = ex.Message;
         }
+    }
+
+    // --- Inline editing support ---
+    private int? editingEmployeeId = null;
+    private Dictionary<int, Employee> editEmployeeCopies = new();
+
+    private HashSet<int> editingContractIds = new();
+    private Dictionary<int, Contract> editContractCopies = new();
+
+    private void EditEmployee(Employee e)
+    {
+        editingEmployeeId = e.Id;
+        editEmployeeCopies[e.Id] = new Employee
+        {
+            Id = e.Id,
+            Name = e.Name,
+            Group = e.Group,
+            HireDate = e.HireDate,
+            ExperienceMonth = e.ExperienceMonth
+        };
+    }
+
+    private async Task SaveEmployee(int id)
+    {
+        if (!editEmployeeCopies.TryGetValue(id, out var copy)) return;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Employees.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.Name = copy.Name;
+                dbItem.Group = copy.Group;
+                dbItem.HireDate = copy.HireDate;
+                dbItem.ExperienceMonth = copy.ExperienceMonth;
+                await db.SaveChangesAsync();
+
+                // update local list
+                var idx = employees.FindIndex(x => x.Id == id);
+                if (idx >= 0)
+                {
+                    employees[idx].Name = dbItem.Name;
+                    employees[idx].Group = dbItem.Group;
+                    employees[idx].HireDate = dbItem.HireDate;
+                    employees[idx].ExperienceMonth = dbItem.ExperienceMonth;
+                }
+                message = "Mitarbeiter gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            editEmployeeCopies.Remove(id);
+            editingEmployeeId = null;
+        }
+    }
+
+    private void CancelEditEmployee(int id)
+    {
+        editEmployeeCopies.Remove(id);
+        if (editingEmployeeId == id) editingEmployeeId = null;
+    }
+
+    private void EditContract(Contract c)
+    {
+        editingContractIds.Add(c.Id);
+        editContractCopies[c.Id] = new Contract
+        {
+            Id = c.Id,
+            EmployeeId = c.EmployeeId,
+            Start = c.Start,
+            End = c.End,
+            Fte = c.Fte
+        };
+    }
+
+    private async Task SaveContract(int id)
+    {
+        if (!editContractCopies.TryGetValue(id, out var copy)) return;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Contracts.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.Start = copy.Start;
+                dbItem.End = copy.End;
+                dbItem.Fte = copy.Fte;
+                await db.SaveChangesAsync();
+
+                // update local cache
+                foreach (var kv in contractsByEmployee)
+                {
+                    var idx = kv.Value.FindIndex(x => x.Id == id);
+                    if (idx >= 0)
+                    {
+                        kv.Value[idx].Start = dbItem.Start;
+                        kv.Value[idx].End = dbItem.End;
+                        kv.Value[idx].Fte = dbItem.Fte;
+                    }
+                }
+                message = "Vertrag gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            editContractCopies.Remove(id);
+            editingContractIds.Remove(id);
+        }
+    }
+
+    private void CancelEditContract(int id)
+    {
+        editContractCopies.Remove(id);
+        editingContractIds.Remove(id);
     }
 }

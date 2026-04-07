@@ -59,14 +59,29 @@ else
             {
                 <tr>
                     <td>@c.Id</td>
-                    <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
-                    <td>@c.Start.ToShortDateString()</td>
-                    <td>@c.End.ToShortDateString()</td>
-                    <td>@c.Fte</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "-" : "+")</button>
-                        <button class="btn btn-danger btn-sm ms-2" @onclick="() => DeleteContract(c.Id)">Löschen</button>
-                    </td>
+                    @if (editingContractId == c.Id)
+                    {
+                        <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
+                        <td><input type="date" class="form-control" @bind="editContractCopy.Start" /></td>
+                        <td><input type="date" class="form-control" @bind="editContractCopy.End" /></td>
+                        <td><input type="number" step="0.01" class="form-control" @bind="editContractCopy.Fte" /></td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContract(editContractCopy.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContract()">Abbrechen</button>
+                        </td>
+                    }
+                    else
+                    {
+                        <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
+                        <td>@c.Start.ToShortDateString()</td>
+                        <td>@c.End.ToShortDateString()</td>
+                        <td>@c.Fte</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "-" : "+")</button>
+                            <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => EditContractRow(c)">Bearbeiten</button>
+                            <button class="btn btn-danger btn-sm ms-2" @onclick="() => DeleteContract(c.Id)">Löschen</button>
+                        </td>
+                    }
                 </tr>
                 @if (expanded.Contains(c.Id))
                 {
@@ -88,13 +103,32 @@ else
                                             @foreach (var cp in c.Payments.OrderByDescending(x => x.Payment?.Date))
                                             {
                                                 <tr>
-                                                    <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
-                                                    <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
-                                                    <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
-                                                    <td>@cp.SharePercent</td>
-                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
-                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
-                                                    <td><button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, c.Id)">Entfernen</button></td>
+                                                    @if (editingContractPaymentIds.Contains(cp.Id))
+                                                    {
+                                                        <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
+                                                        <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
+                                                        <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
+                                                        <td><input type="number" class="form-control" @bind="editContractPaymentCopies[cp.Id].SharePercent" /></td>
+                                                        <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
+                                                        <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractPayment(cp.Id)">Speichern</button>
+                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractPayment(cp.Id)">Abbrechen</button>
+                                                        </td>
+                                                    }
+                                                    else
+                                                    {
+                                                        <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
+                                                        <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
+                                                        <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
+                                                        <td>@cp.SharePercent</td>
+                                                        <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                        <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractPayment(cp)">Bearbeiten</button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, c.Id)">Entfernen</button>
+                                                        </td>
+                                                    }
                                                 </tr>
                                             }
                                         </tbody>
@@ -320,6 +354,123 @@ else
         catch (Exception ex)
         {
             message = ex.Message;
+        }
+    }
+
+    // --- Inline edit support ---
+    private int? editingContractId = null;
+    private Contract editContractCopy = new Contract();
+
+    private HashSet<int> editingContractPaymentIds = new();
+    private Dictionary<int, ContractPayment> editContractPaymentCopies = new();
+
+    private void EditContractRow(Contract c)
+    {
+        editingContractId = c.Id;
+        editContractCopy = new Contract
+        {
+            Id = c.Id,
+            EmployeeId = c.EmployeeId,
+            Start = c.Start,
+            End = c.End,
+            Fte = c.Fte
+        };
+    }
+
+    private void CancelEditContract()
+    {
+        editingContractId = null;
+        editContractCopy = new Contract();
+    }
+
+    private async Task SaveContract(int id)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Contracts.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.Start = editContractCopy.Start;
+                dbItem.End = editContractCopy.End;
+                dbItem.Fte = editContractCopy.Fte;
+                await db.SaveChangesAsync();
+
+                var idx = contracts.FindIndex(x => x.Id == id);
+                if (idx >= 0)
+                {
+                    contracts[idx].Start = dbItem.Start;
+                    contracts[idx].End = dbItem.End;
+                    contracts[idx].Fte = dbItem.Fte;
+                }
+                message = "Vertrag gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            CancelEditContract();
+        }
+    }
+
+    private void EditContractPayment(ContractPayment cp)
+    {
+        editingContractPaymentIds.Add(cp.Id);
+        editContractPaymentCopies[cp.Id] = new ContractPayment
+        {
+            Id = cp.Id,
+            ContractId = cp.ContractId,
+            PaymentId = cp.PaymentId,
+            SharePercent = cp.SharePercent,
+            Start = cp.Start,
+            End = cp.End
+        };
+    }
+
+    private void CancelEditContractPayment(int id)
+    {
+        editingContractPaymentIds.Remove(id);
+        editContractPaymentCopies.Remove(id);
+    }
+
+    private async Task SaveContractPayment(int id)
+    {
+        if (!editContractPaymentCopies.TryGetValue(id, out var copy)) return;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.ContractPayments.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.SharePercent = copy.SharePercent;
+                dbItem.Start = copy.Start;
+                dbItem.End = copy.End;
+                await db.SaveChangesAsync();
+
+                // update local model
+                foreach (var c in contracts)
+                {
+                    var idx = c.Payments?.FindIndex(x => x.Id == id) ?? -1;
+                    if (idx >= 0)
+                    {
+                        c.Payments[idx].SharePercent = dbItem.SharePercent;
+                        c.Payments[idx].Start = dbItem.Start;
+                        c.Payments[idx].End = dbItem.End;
+                    }
+                }
+                message = "Zuweisung gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            CancelEditContractPayment(id);
         }
     }
 }

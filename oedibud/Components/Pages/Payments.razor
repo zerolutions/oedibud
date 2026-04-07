@@ -49,12 +49,30 @@ else
                                             @foreach (var cp in p.ContractAssignments.OrderByDescending(x => x.SharePercent))
                                             {
                                                 <tr>
-                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
-                                                    <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
-                                                    <td>@cp.SharePercent</td>
-                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
-                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
-                                                    <td><button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, p.Id)">Entfernen</button></td>
+                                                    @if (editingContractAssignIds.Contains(cp.Id))
+                                                    {
+                                                        <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
+                                                        <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                        <td><input type="number" class="form-control" @bind="editContractAssignCopies[cp.Id].SharePercent" /></td>
+                                                        <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
+                                                        <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractAssignmentEdit(cp.Id)">Speichern</button>
+                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractAssignment(cp.Id)">Abbrechen</button>
+                                                        </td>
+                                                    }
+                                                    else
+                                                    {
+                                                        <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
+                                                        <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                        <td>@cp.SharePercent</td>
+                                                        <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                        <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractAssignment(cp)">Bearbeiten</button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, p.Id)">Entfernen</button>
+                                                        </td>
+                                                    }
                                                 </tr>
                                             }
                                         </tbody>
@@ -219,6 +237,69 @@ else
         catch (Exception ex)
         {
             message = ex.Message;
+        }
+    }
+
+    // --- Inline edit support for contract assignments ---
+    private HashSet<int> editingContractAssignIds = new();
+    private Dictionary<int, ContractPayment> editContractAssignCopies = new();
+
+    private void EditContractAssignment(ContractPayment cp)
+    {
+        editingContractAssignIds.Add(cp.Id);
+        editContractAssignCopies[cp.Id] = new ContractPayment
+        {
+            Id = cp.Id,
+            ContractId = cp.ContractId,
+            PaymentId = cp.PaymentId,
+            SharePercent = cp.SharePercent,
+            Start = cp.Start,
+            End = cp.End
+        };
+    }
+
+    private void CancelEditContractAssignment(int id)
+    {
+        editingContractAssignIds.Remove(id);
+        editContractAssignCopies.Remove(id);
+    }
+
+    private async Task SaveContractAssignmentEdit(int id)
+    {
+        if (!editContractAssignCopies.TryGetValue(id, out var copy)) return;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.ContractPayments.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.SharePercent = copy.SharePercent;
+                dbItem.Start = copy.Start;
+                dbItem.End = copy.End;
+                await db.SaveChangesAsync();
+
+                var parent = payments.FirstOrDefault(p => p.ContractAssignments.Any(x => x.Id == id));
+                if (parent != null)
+                {
+                    var idx = parent.ContractAssignments.FindIndex(x => x.Id == id);
+                    if (idx >= 0)
+                    {
+                        parent.ContractAssignments[idx].SharePercent = dbItem.SharePercent;
+                        parent.ContractAssignments[idx].Start = dbItem.Start;
+                        parent.ContractAssignments[idx].End = dbItem.End;
+                    }
+                }
+                message = "Zuweisung gespeichert.";
+                Notifier.Notify();
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            CancelEditContractAssignment(id);
         }
     }
 }

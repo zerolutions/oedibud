@@ -41,19 +41,35 @@ else
             {
                 <tr>
                     <td>@p.Id</td>
-                    <td>@p.Title</td>
-                    <td>@p.Start.ToShortDateString()</td>
-                    <td>@p.End.ToShortDateString()</td>
-                    <td>@p.TotalAmount.ToString("C")</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                            @(expanded.Contains(p.Id) ? "-" : "+")
-                        </button>
-                    </td>
+                    @if (editingProjectId == p.Id)
+                    {
+                        <td><input class="form-control" @bind="editProjectCopy.Title" /></td>
+                        <td><input type="date" class="form-control" @bind="editProjectCopy.Start" /></td>
+                        <td><input type="date" class="form-control" @bind="editProjectCopy.End" /></td>
+                        <td>@p.TotalAmount.ToString("C")</td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveProject(editProjectCopy.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditProject()">Abbrechen</button>
+                        </td>
+                        <td></td>
+                    }
+                    else
+                    {
+                        <td>@p.Title</td>
+                        <td>@p.Start.ToShortDateString()</td>
+                        <td>@p.End.ToShortDateString()</td>
+                        <td>@p.TotalAmount.ToString("C")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
+                                @(expanded.Contains(p.Id) ? "-" : "+")
+                            </button>
+                        </td>
 
-                    <td>
-                        <button type="button" class="btn btn-danger" @onclick="@(a => DeleteProjectAndPayments(@p))">Projekt löschen</button>
-                    </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditProject(p)">Bearbeiten</button>
+                            <button type="button" class="btn btn-danger" @onclick="@(a => DeleteProjectAndPayments(@p))">Projekt löschen</button>
+                        </td>
+                    }
                 </tr>
                 @if (expanded.Contains(p.Id))
                 {
@@ -75,12 +91,34 @@ else
                                             @foreach (var pay in p.Payments.OrderByDescending(x => x.Date))
                                             {
                                                 <tr>
-                                                    <td>@pay.Date.ToShortDateString()</td>
-                                                    <td>@pay.Amount.ToString("C")</td>
-                                                    <td>@pay.DetecatedTo.ToString()</td>
-                                                    <td>
-                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Zahlung löschen</button>
-                                                    </td>
+                                                    @if (editingPaymentIds.Contains(pay.Id))
+                                                    {
+                                                        <td><input type="date" class="form-control" @bind="editPaymentCopies[pay.Id].Date" /></td>
+                                                        <td><input type="number" step="0.01" class="form-control" @bind="editPaymentCopies[pay.Id].Amount" /></td>
+                                                        <td>
+                                                            <select class="form-control" @bind="editPaymentCopies[pay.Id].DetecatedTo">
+                                                                <option value="">-- keine Angabe --</option>
+                                                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                                                {
+                                                                    <option value="@g">@g</option>
+                                                                }
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(pay.Id)">Speichern</button>
+                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditPayment(pay.Id)">Abbrechen</button>
+                                                        </td>
+                                                    }
+                                                    else
+                                                    {
+                                                        <td>@pay.Date.ToShortDateString()</td>
+                                                        <td>@pay.Amount.ToString("C")</td>
+                                                        <td>@pay.DetecatedTo.ToString()</td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(pay)">Bearbeiten</button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Zahlung löschen</button>
+                                                        </td>
+                                                    }
                                                 </tr>
                                             }
                                         </tbody>
@@ -295,6 +333,120 @@ else
         catch (Exception ex)
         {
             message = ex.Message;
+        }
+    }
+
+    // --- Inline edit support for projects/payments ---
+    private int? editingProjectId = null;
+    private Project editProjectCopy = new Project();
+
+    private HashSet<int> editingPaymentIds = new();
+    private Dictionary<int, Payment> editPaymentCopies = new();
+
+    private void EditProject(Project p)
+    {
+        editingProjectId = p.Id;
+        editProjectCopy = new Project
+        {
+            Id = p.Id,
+            Title = p.Title,
+            Start = p.Start,
+            End = p.End
+        };
+    }
+
+    private void CancelEditProject()
+    {
+        editingProjectId = null;
+        editProjectCopy = new Project();
+    }
+
+    private async Task SaveProject(int id)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Projects.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.Title = editProjectCopy.Title;
+                dbItem.Start = editProjectCopy.Start;
+                dbItem.End = editProjectCopy.End;
+                await db.SaveChangesAsync();
+
+                var idx = projects.FindIndex(x => x.Id == id);
+                if (idx >= 0)
+                {
+                    projects[idx].Title = dbItem.Title;
+                    projects[idx].Start = dbItem.Start;
+                    projects[idx].End = dbItem.End;
+                }
+                message = "Projekt gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            CancelEditProject();
+        }
+    }
+
+    private void EditPayment(Payment p)
+    {
+        editingPaymentIds.Add(p.Id);
+        editPaymentCopies[p.Id] = new Payment
+        {
+            Id = p.Id,
+            Date = p.Date,
+            Amount = p.Amount,
+            DetecatedTo = p.DetecatedTo,
+            ProjectId = p.ProjectId
+        };
+    }
+
+    private void CancelEditPayment(int id)
+    {
+        editingPaymentIds.Remove(id);
+        editPaymentCopies.Remove(id);
+    }
+
+    private async Task SavePayment(int id)
+    {
+        if (!editPaymentCopies.TryGetValue(id, out var copy)) return;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Payments.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.Date = copy.Date;
+                dbItem.Amount = copy.Amount;
+                dbItem.DetecatedTo = copy.DetecatedTo;
+                await db.SaveChangesAsync();
+
+                foreach (var proj in projects)
+                {
+                    var idx = proj.Payments?.FindIndex(x => x.Id == id) ?? -1;
+                    if (idx >= 0)
+                    {
+                        proj.Payments[idx].Date = dbItem.Date;
+                        proj.Payments[idx].Amount = dbItem.Amount;
+                        proj.Payments[idx].DetecatedTo = dbItem.DetecatedTo;
+                    }
+                }
+                message = "Zahlung gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            CancelEditPayment(id);
         }
     }
 }
