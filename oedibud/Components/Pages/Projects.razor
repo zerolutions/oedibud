@@ -30,7 +30,7 @@ else
     <table class="table table-striped">
         <thead>
             <tr>
-                <th>Id</th>
+                <th>ID</th>
                 <th>Titel</th>
                 <th>Projektstart</th>
                 <th>Projektende</th>
@@ -53,7 +53,7 @@ else
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveProject(editProjectCopy.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditProject()">Abbrechen</button>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                                @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel zuweisen")
+                                @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel verwalten")
                             </button>
                         </td>
                         <td></td>
@@ -68,7 +68,7 @@ else
                             <button type="button" class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditProject(p)">Bearbeiten</button>
                             <button type="button" class="btn btn-sm btn-danger me-2" @onclick="@(a => DeleteProjectAndPayments(@p))">Löschen</button>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                                @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel zuweisen")
+                                @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel verwalten")
                             </button>
                         </td>
                     }
@@ -76,65 +76,89 @@ else
                 @if (expanded.Contains(p.Id))
                 {
                     <tr>
-                        <td colspan="7" class="p-0">
+                        <td colspan="7" class="p-0 bg-dark-subtle">
                             <div class="p-3">
-                                <h6>Personalmittel</h6>
+                                @* <h6>Personalmittel</h6> *@
                                 @if (p.Payments.Count == 0)
                                 {
-                                    <div><em>Keine Personalmittel</em></div>
+                                    <div><em>Keine Projektmittel zugewiesen</em></div>
                                 }
-                                else
-                                {
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var pay in p.Payments.OrderByDescending(x => x.Start))
-                                            {
-                                                <tr>
-                                                    @if (editingPaymentIds.Contains(pay.Id))
+                                @* else
+                                { *@
+                                <table class="table-sm">
+                                    <thead>
+                                        <tr><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var pay in p.Payments.OrderByDescending(x => x.Start))
+                                        {
+                                            <tr>
+                                                @if (editingPaymentIds.Contains(pay.Id))
+                                                {
+                                                    <td>
+                                                        <input type="date" class="form-control mb-1" @bind="editPaymentCopies[pay.Id].Start" />
+                                                    </td>
+                                                    <td>
+                                                        <input type="date" class="form-control" @bind="editPaymentCopies[pay.Id].End" />
+                                                    </td>
+                                                    <td><input type="number" step="1" class="form-control" @bind="editPaymentCopies[pay.Id].Amount" /></td>
+                                                    <td>
+                                                        <select class="form-control" @bind="editPaymentCopies[pay.Id].DetecatedTo">
+                                                            <option value="">-- keine Angabe --</option>
+                                                            @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                                            {
+                                                                <option value="@g">@g</option>
+                                                            }
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(pay.Id)">Speichern</button>
+                                                        <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditPayment(pay.Id)">Abbrechen</button>
+                                                    </td>
+                                                }
+                                                else
+                                                {
+                                                    <td>@pay.Start.ToShortDateString()</td>
+                                                    <td>@pay.End.ToShortDateString()</td>
+                                                    <td>@pay.Amount.ToString("C")</td>
+                                                    <td>@pay.DetecatedTo.ToString()</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(pay)">Bearbeiten</button>
+                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Projektmittel löschen</button>
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                        <tr>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="paymentInputs[p.Id].Start" />
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="paymentInputs[p.Id].End" />
+                                            </td>
+                                            <td>
+                                                <input type="number" step="1" class="form-control" @bind="paymentInputs[p.Id].Amount" />
+                                            </td>
+                                            <td>
+                                                <select class="form-control" @bind="paymentInputs[p.Id].DetecatedTo">
+                                                    <option value="">-- keine Angabe --</option>
+                                                    @foreach (var g in Enum.GetValues<EmployeeGroup>())
                                                     {
-                                                        <td>
-                                                            <input type="date" class="form-control mb-1" @bind="editPaymentCopies[pay.Id].Start" />
-                                                        </td>
-                                                        <td>
-                                                            <input type="date" class="form-control" @bind="editPaymentCopies[pay.Id].End" />
-                                                        </td>
-                                                        <td><input type="number" step="1" class="form-control" @bind="editPaymentCopies[pay.Id].Amount" /></td>
-                                                        <td>
-                                                            <select class="form-control" @bind="editPaymentCopies[pay.Id].DetecatedTo">
-                                                                <option value="">-- keine Angabe --</option>
-                                                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                                                                {
-                                                                    <option value="@g">@g</option>
-                                                                }
-                                                            </select>
-                                                        </td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(pay.Id)">Speichern</button>
-                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditPayment(pay.Id)">Abbrechen</button>
-                                                        </td>
+                                                        <option value="@g">@g</option>
                                                     }
-                                                    else
-                                                    {
-                                                        <td>@pay.Start.ToShortDateString()</td>
-                                                        <td>@pay.End.ToShortDateString()</td>
-                                                        <td>@pay.Amount.ToString("C")</td>
-                                                        <td>@pay.DetecatedTo.ToString()</td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(pay)">Bearbeiten</button>
-                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Projektmittel löschen</button>
-                                                        </td>
-                                                    }
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-success" @onclick="() => AddPayment(p)">Hinzufügen</button>
+                                            </td>
 
-                                <div class="border-top pt-2 mt-2">
-                                    @* <h6>Add payment</h6> *@
+                                        </tr>
+
+                                    </tbody>
+                                </table>
+                                @* } *@
+
+                                @* <div class="border-top pt-2 mt-2">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-auto">
                                             <label class="form-label">Von</label>
@@ -162,7 +186,7 @@ else
                                             <button class="btn btn-success" @onclick="() => AddPayment(p)">Hinzufügen</button>
                                         </div>
                                     </div>
-                                </div>
+                                </div> *@
                             </div>
                         </td>
                     </tr>
@@ -178,8 +202,8 @@ else
 
     private Project project = new()
     {
-        Start = DateTime.Today,
-        End = DateTime.Today.AddYears(3)
+        Start = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+        End = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(36).AddDays(-1)
     };
     private string message = "";
     private HashSet<int> expanded = new();
@@ -436,27 +460,27 @@ else
         {
             using var db = DbFactory.CreateDbContext();
             var dbItem = await db.Payments.FindAsync(id);
-                if (dbItem != null)
-                {
-                    dbItem.Start = copy.Start;
-                    dbItem.End = copy.End;
-                    dbItem.Amount = copy.Amount;
-                    dbItem.DetecatedTo = copy.DetecatedTo;
-                    await db.SaveChangesAsync();
+            if (dbItem != null)
+            {
+                dbItem.Start = copy.Start;
+                dbItem.End = copy.End;
+                dbItem.Amount = copy.Amount;
+                dbItem.DetecatedTo = copy.DetecatedTo;
+                await db.SaveChangesAsync();
 
-                    foreach (var proj in projects)
+                foreach (var proj in projects)
+                {
+                    var idx = proj.Payments?.FindIndex(x => x.Id == id) ?? -1;
+                    if (idx >= 0)
                     {
-                        var idx = proj.Payments?.FindIndex(x => x.Id == id) ?? -1;
-                        if (idx >= 0)
-                        {
-                            proj.Payments[idx].Start = dbItem.Start;
-                            proj.Payments[idx].End = dbItem.End;
-                            proj.Payments[idx].Amount = dbItem.Amount;
-                            proj.Payments[idx].DetecatedTo = dbItem.DetecatedTo;
-                        }
+                        proj.Payments[idx].Start = dbItem.Start;
+                        proj.Payments[idx].End = dbItem.End;
+                        proj.Payments[idx].Amount = dbItem.Amount;
+                        proj.Payments[idx].DetecatedTo = dbItem.DetecatedTo;
                     }
-                    message = "Projektmittel gespeichert.";
                 }
+                message = "Projektmittel gespeichert.";
+            }
         }
         catch (Exception ex)
         {

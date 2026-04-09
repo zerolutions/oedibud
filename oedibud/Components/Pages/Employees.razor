@@ -80,7 +80,7 @@ else
                         <td>
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge verwalten")</button>
                         </td>
                     }
                     else
@@ -95,7 +95,7 @@ else
                         <td>
                             <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
                             <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge verwalten")</button>
                         </td>
                     }
                 </tr>
@@ -167,7 +167,7 @@ else
 @code {
     private Employee employee = new()
     {
-        HireDate = DateTime.Today,
+        HireDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
         BruttoFactor = 1.3M
     };
 
@@ -176,8 +176,8 @@ else
     private Dictionary<int, List<Contract>> contractsByEmployee = new();
     private class ContractInput
     {
-        public DateTime Start { get; set; } = DateTime.Today;
-        public DateTime End { get; set; } = DateTime.Today.AddMonths(1);
+        public DateTime Start { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        public DateTime End { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1);
         public float Fte { get; set; } = 1.0f;
     }
     private Dictionary<int, ContractInput> contractInputs = new();

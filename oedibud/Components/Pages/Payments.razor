@@ -18,21 +18,21 @@
         {
             <option value="@pr.Id">@pr.Title</option>
         }
-        </select>
+    </select>
     <label>Von</label>
-        <input type="date" class="form-control mb-2" @bind="newPayment.Start" />
+    <input type="date" class="form-control mb-2" @bind="newPayment.Start" />
     <label>Bis</label>
-        <input type="date" class="form-control mb-2" @bind="newPayment.End" />
+    <input type="date" class="form-control mb-2" @bind="newPayment.End" />
     <label>Betrag</label>
-        <input type="number" step="1" class="form-control mb-2" @bind="newPayment.Amount" />
-    <label >Gewidmet</label>
+    <input type="number" step="1" class="form-control mb-2" @bind="newPayment.Amount" />
+    <label>Gewidmet</label>
     <select class="form-control mb-2" @bind="newPayment.DetecatedTo">
         <option value="">-- keine Angabe --</option>
         @foreach (var g in Enum.GetValues<EmployeeGroup>())
         {
             <option value="@g">@g</option>
         }
-        </select>
+    </select>
     <button class="btn btn-primary mt-2" @onclick="AddNewPayment">Projektmittel hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
@@ -48,7 +48,7 @@ else
 {
     <table class="table table-striped">
         <thead>
-            <tr><th>Id</th><th>Projekt</th><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
+            <tr><th>ID</th><th>Projekt</th><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var p in payments)
@@ -108,81 +108,93 @@ else
                 if (expanded.Contains(p.Id))
                 {
                     <tr>
-                        <td colspan="6" class="p-0">
+                        <td colspan="6" class="p-0 bg-dark-subtle">
                             <div class="p-3">
-                                <h6>Zugeordnete Arbeitsverträge</h6>
                                 @if (p.ContractAssignments == null || p.ContractAssignments.Count == 0)
                                 {
-                                    <div><em>Keine Zuordnungen</em></div>
+                                    <div><em>Keine Arbeitsverträge zugewiesen</em></div>
                                 }
-                                else
-                                {
-                                    <table class="table table-sm">
-                                        <thead><tr><th>Vertrag</th><th>Mitarbeiter</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr></thead>
-                                        <tbody>
-                                            @foreach (var cp in p.ContractAssignments.OrderByDescending(x => x.SharePercent))
-                                            {
-                                                <tr>
-                                                    @if (editingContractAssignIds.Contains(cp.Id))
+                                @* else
+                                { *@
+                                <table class="table-sm">
+                                    <thead><tr><th>Vertrag</th><th>Mitarbeiter</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+                                    <tbody>
+                                        @foreach (var cp in p.ContractAssignments.OrderByDescending(x => x.SharePercent))
+                                        {
+                                            <tr>
+                                                @if (editingContractAssignIds.Contains(cp.Id))
+                                                {
+                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
+                                                    <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    <td><input type="number" class="form-control" @bind="editContractAssignCopies[cp.Id].SharePercent" /></td>
+                                                    <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
+                                                    <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractAssignmentEdit(cp.Id)">Speichern</button>
+                                                        <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractAssignment(cp.Id)">Abbrechen</button>
+                                                    </td>
+                                                }
+                                                else
+                                                {
+                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
+                                                    <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    <td>@cp.SharePercent</td>
+                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractAssignment(cp)">Bearbeiten</button>
+                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, p.Id)">Entfernen</button>
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                        <tr>
+                                            <td colspan="2">
+                                                <select class="form-control" @bind="contractInputs[p.Id].ContractId">
+                                                    <option value="0">-- auswählen --</option>
+                                                    @foreach (var c in AvailableContractsForPayment(p))
                                                     {
-                                                        <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
-                                                        <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
-                                                        <td><input type="number" class="form-control" @bind="editContractAssignCopies[cp.Id].SharePercent" /></td>
-                                                        <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
-                                                        <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractAssignmentEdit(cp.Id)">Speichern</button>
-                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractAssignment(cp.Id)">Abbrechen</button>
-                                                        </td>
+                                                        <option value="@c.Id">@($"{c.Id} - {c.Employee?.Name ?? "-"} ({c.Start.ToShortDateString()} - {c.End.ToShortDateString()})")</option>
                                                     }
-                                                    else
-                                                    {
-                                                        <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
-                                                        <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
-                                                        <td>@cp.SharePercent</td>
-                                                        <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
-                                                        <td>@(cp.End?.ToShortDateString() ?? "-")</td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractAssignment(cp)">Bearbeiten</button>
-                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, p.Id)">Entfernen</button>
-                                                        </td>
-                                                    }
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-control" min="0" max="100" @bind="contractInputs[p.Id].SharePercent" />
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="contractInputs[p.Id].Start" />
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="contractInputs[p.Id].End" />
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-success" @onclick="() => AddContractAssignment(p)">Zuweisen</button>
+                                            </td>
 
-                                <div class="border-top pt-2 mt-2">
-                                    <h6>Arbeitsverträge zuweisen</h6>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                @* } *@
+
+                                @* <div class="border-top pt-2 mt-2">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-auto">
                                             <label class="form-label">Vertrag</label>
-                                            <select class="form-control" @bind="contractInputs[p.Id].ContractId">
-                                                <option value="0">-- auswählen --</option>
-                                                @foreach (var c in AvailableContractsForPayment(p))
-                                                {
-                                                    <option value="@c.Id">@($"{c.Id} - {c.Employee?.Name ?? "-"} ({c.Start.ToShortDateString()} - {c.End.ToShortDateString()})")</option>
-                                                }
-                                            </select>
+                                            
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label">Anteil %</label>
-                                            <input type="number" class="form-control" min="0" max="100" @bind="contractInputs[p.Id].SharePercent" />
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label">Von</label>
-                                            <input type="date" class="form-control" @bind="contractInputs[p.Id].Start" />
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label">Bis</label>
-                                            <input type="date" class="form-control" @bind="contractInputs[p.Id].End" />
                                         </div>
                                         <div class="col-auto">
-                                            <button class="btn btn-success" @onclick="() => AddContractAssignment(p)">Zuweisen</button>
                                         </div>
                                     </div>
-                                </div>
+                                </div> *@
                             </div>
                         </td>
                     </tr>
@@ -251,13 +263,13 @@ else
         contractInputs = payments.ToDictionary(p => p.Id, p => new ContractAssignInput());
 
         // ensure newPayment project default is set if possible
-            if (projects.Count > 0 && newPayment.ProjectId == 0)
-            {
-                newPayment.ProjectId = projects.First().Id;
-                // prefill start/end from first project
-                newPayment.Start = projects.First().Start;
-                newPayment.End = projects.First().End;
-            }
+        if (projects.Count > 0 && newPayment.ProjectId == 0)
+        {
+            newPayment.ProjectId = projects.First().Id;
+            // prefill start/end from first project
+            newPayment.Start = projects.First().Start;
+            newPayment.End = projects.First().End;
+        }
     }
 
     private void NewPaymentProjectChanged(ChangeEventArgs e)
