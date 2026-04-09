@@ -30,7 +30,7 @@
             <option value="@g">@g</option>
         }
     </select>
-    <button class="btn btn-primary" @onclick="AddNewPayment">Hinzufügen</button>
+    <button class="btn btn-primary" @onclick="AddNewPayment">Zahlung hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="mt-2 text-info">@message</div>
@@ -74,8 +74,9 @@ else
                             </select>
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-success me-1" @onclick="() => SavePaymentEdit(p.Id)">Speichern</button>
-                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditPayment()">Abbrechen</button>
+                            <button class="btn btn-sm btn-success me-2" @onclick="() => SavePaymentEdit(p.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditPayment()">Abbrechen</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Vertrag zuweisen")</button>
                         </td>
                     </tr>
                 }
@@ -88,9 +89,9 @@ else
                         <td>@p.Amount.ToString("C")</td>
                         <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPaymentRow(p)">Bearbeiten</button>
-                            <button class="btn btn-sm btn-danger me-1" @onclick="() => DeletePayment(p)">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" :  "Anzeigen")</button>
+                            <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditPaymentRow(p)">Bearbeiten</button>
+                            <button class="btn btn-sm btn-danger me-2" @onclick="() => DeletePayment(p)">Löschen</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Vertrag zuweisen")</button>
                         </td>
                     </tr>
                 }

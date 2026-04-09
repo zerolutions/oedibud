@@ -11,7 +11,7 @@
     Titel:<input @bind="project.Title" class="form-control mb-1" />
     Projektstart:<input type="date" @bind="project.Start" class="form-control mb-1" />
     Projektende:<input type="date" @bind="project.End" class="form-control mb-1" />
-    <button class="btn btn-primary" @onclick="AddProject">Hinzufügen</button>
+    <button class="btn btn-primary" @onclick="AddProject">Projekt hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="mt-2 text-info">@message</div>
@@ -33,7 +33,7 @@ else
                 <th>Projektstart</th>
                 <th>Projektende</th>
                 <th>Gesamt</th>
-                <th>Zahlungen</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -48,8 +48,11 @@ else
                         <td><input type="date" class="form-control" @bind="editProjectCopy.End" /></td>
                         <td>@p.TotalAmount.ToString("C")</td>
                         <td>
-                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveProject(editProjectCopy.Id)">Speichern</button>
-                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditProject()">Abbrechen</button>
+                            <button class="btn btn-sm btn-success me-2" @onclick="() => SaveProject(editProjectCopy.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditProject()">Abbrechen</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
+                                @(expanded.Contains(p.Id) ? "Verstecken" : "Zahlung zuweisen")
+                            </button>
                         </td>
                         <td></td>
                     }
@@ -60,14 +63,11 @@ else
                         <td>@p.End.ToShortDateString()</td>
                         <td>@p.TotalAmount.ToString("C")</td>
                         <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditProject(p)">Bearbeiten</button>
+                            <button type="button" class="btn btn-sm btn-danger me-2" @onclick="@(a => DeleteProjectAndPayments(@p))">Löschen</button>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                                @(expanded.Contains(p.Id) ? "Verstecken" :  "Anzeigen")
+                                @(expanded.Contains(p.Id) ? "Verstecken" : "Zahlung zuweisen")
                             </button>
-                        </td>
-
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditProject(p)">Bearbeiten</button>
-                            <button type="button" class="btn btn-danger" @onclick="@(a => DeleteProjectAndPayments(@p))">Projekt löschen</button>
                         </td>
                     }
                 </tr>
