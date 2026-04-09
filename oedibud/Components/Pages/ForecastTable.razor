@@ -249,7 +249,7 @@
                 <tr class="table-primary">
                     <td>
                         <button class="btn btn-link" @onclick="() => Toggle(row.EmployeeId)">
-                            @(Expanded.Contains(row.EmployeeId) ? "-" : "+")
+                            @(Expanded.Contains(row.EmployeeId) ? "Verstecken" :  "Anzeigen")
                         </button>
                         @row.Label
                     </td>

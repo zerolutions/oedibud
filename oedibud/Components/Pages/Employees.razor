@@ -1,5 +1,6 @@
 ﻿@page "/employees"
 
+@using Blazorise
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Linq
@@ -50,8 +51,8 @@ else
                 <th>Vorerfahrung (M.)</th>
                 <th>Nächste Stufe</th>
                 <th>Arbeitgeber Faktor</th>
-                <th></th>
-                <th></th>
+                <th>Verträge</th>
+                <th>Mitarbeiter</th>
             </tr>
         </thead>
         <tbody>
@@ -76,7 +77,7 @@ else
                         <td>@e.NextLevel.ToShortDateString()</td>
                         <td><input type="number" class="form-control" @bind="editEmployeeCopies[e.Id].BruttoFactor" /></td>
                         <td>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" :  "Anzeigen")</button>
                         </td>
                         <td>
                             <button class="btn btn-sm btn-success me-1" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
@@ -93,7 +94,7 @@ else
                         <td>@e.NextLevel.ToShortDateString()</td>
                         <td>@e.BruttoFactor</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "-" : "+")</button>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" :  "Anzeigen")</button>
                         </td>
                         <td>
                             <button type="button" class="btn btn-outline-primary btn-sm me-1" @onclick="() => EditEmployee(e)">Bearbeiten</button>
@@ -105,16 +106,19 @@ else
                 @if (expanded.Contains(e.Id))
                 {
                     <tr>
-                        <td colspan="9" class="p-0">
-                            <div class="p-3">
-                                <h6>Verträge</h6>
+                        <td colspan="10" class="p-0 bg-dark-subtle">
+                            <div class="p-3 ">
+                                @* <h6>Verträge</h6> *@
+                                
+                                @* else
+                                { *@
                                 @if (!contractsByEmployee.ContainsKey(e.Id) || contractsByEmployee[e.Id].Count == 0)
                                 {
-                                    <div><em>Keine Verträge</em></div>
-                                }
-                                else
-                                {
-                                    <table class="table table-sm">
+                        @* <tr><td colspan="5"> *@
+                            <em>Keine Verträge vorhanden</em>
+                            @* </td></tr> *@
+                    }
+                                    <table class="table-sm">
                                         <thead>
                                             <tr><th>Start</th><th>Ende</th><th>FTE</th><th></th></tr>
                                         </thead>
@@ -144,11 +148,25 @@ else
                                                     }
                                                 </tr>
                                             }
+                                        <tr>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="contractInputs[e.Id].Start" />
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="contractInputs[e.Id].End" />
+                                            </td>
+                                                <td><input type="number" step="0.01" class="form-control" @bind="contractInputs[e.Id].Fte"/></td>
+                                                <td>
+                                                <button class="btn btn-success" @onclick="() => AddContractForEmployee(e.Id)">Hinzufügen</button>
+
+                                                </td>
+                                            
+                                        </tr>
                                         </tbody>
                                     </table>
-                                }
+                                @* } *@
 
-                                <div class="border-top pt-2 mt-2">
+                                @* <div class="border-top pt-2 mt-2">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-auto">
                                             <label class="form-label">Start</label>
@@ -166,7 +184,7 @@ else
                                             <button class="btn btn-success" @onclick="() => AddContractForEmployee(e.Id)">Hinzufügen</button>
                                         </div>
                                     </div>
-                                </div>
+                                </div> *@
                             </div>
                         </td>
                     </tr>

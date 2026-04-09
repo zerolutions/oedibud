@@ -61,7 +61,7 @@ else
                         <td>@p.TotalAmount.ToString("C")</td>
                         <td>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                                @(expanded.Contains(p.Id) ? "-" : "+")
+                                @(expanded.Contains(p.Id) ? "Verstecken" :  "Anzeigen")
                             </button>
                         </td>
 

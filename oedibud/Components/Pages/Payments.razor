@@ -28,7 +28,7 @@ else
                     <td>@(p.Project?.Title ?? "-")</td>
                     <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "-" : "+")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" :  "Anzeigen")</button>
                     </td>
                 </tr>
                 @if (expanded.Contains(p.Id))
