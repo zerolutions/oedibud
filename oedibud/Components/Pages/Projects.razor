@@ -10,9 +10,9 @@
 <h3 class="text-primary-emphasis">Projekte</h3>
 <hr />
 <div class="mb-3">
-    Titel<input @bind="project.Title" class="form-control mb-2" />
-    Projektstart<input type="date" @bind="project.Start" class="form-control mb-2" />
-    Projektende<input type="date" @bind="project.End" class="form-control mb-2" />
+    <label>Titel</label><input @bind="project.Title" class="form-control mb-2" />
+    <label>Projektstart</label><input type="date" @bind="project.Start" class="form-control mb-2" />
+    <label>Projektende</label><input type="date" @bind="project.End" class="form-control mb-2" />
     <button class="btn btn-primary mt-2" @onclick="AddProject">Projekt hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
@@ -87,15 +87,20 @@ else
                                 {
                                     <table class="table table-sm">
                                         <thead>
-                                            <tr><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
+                                            <tr><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
                                         </thead>
                                         <tbody>
-                                            @foreach (var pay in p.Payments.OrderByDescending(x => x.Date))
+                                            @foreach (var pay in p.Payments.OrderByDescending(x => x.Start))
                                             {
                                                 <tr>
                                                     @if (editingPaymentIds.Contains(pay.Id))
                                                     {
-                                                        <td><input type="date" class="form-control" @bind="editPaymentCopies[pay.Id].Date" /></td>
+                                                        <td>
+                                                            <input type="date" class="form-control mb-1" @bind="editPaymentCopies[pay.Id].Start" />
+                                                        </td>
+                                                        <td>
+                                                            <input type="date" class="form-control" @bind="editPaymentCopies[pay.Id].End" />
+                                                        </td>
                                                         <td><input type="number" step="1" class="form-control" @bind="editPaymentCopies[pay.Id].Amount" /></td>
                                                         <td>
                                                             <select class="form-control" @bind="editPaymentCopies[pay.Id].DetecatedTo">
@@ -113,7 +118,8 @@ else
                                                     }
                                                     else
                                                     {
-                                                        <td>@pay.Date.ToShortDateString()</td>
+                                                        <td>@pay.Start.ToShortDateString()</td>
+                                                        <td>@pay.End.ToShortDateString()</td>
                                                         <td>@pay.Amount.ToString("C")</td>
                                                         <td>@pay.DetecatedTo.ToString()</td>
                                                         <td>
@@ -131,8 +137,12 @@ else
                                     @* <h6>Add payment</h6> *@
                                     <div class="row g-2 align-items-end">
                                         <div class="col-auto">
-                                            <label class="form-label">Datum</label>
-                                            <input type="date" class="form-control" @bind="paymentInputs[p.Id].Date" />
+                                            <label class="form-label">Von</label>
+                                            <input type="date" class="form-control" @bind="paymentInputs[p.Id].Start" />
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label">Bis</label>
+                                            <input type="date" class="form-control" @bind="paymentInputs[p.Id].End" />
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label">Betrag</label>
@@ -177,14 +187,16 @@ else
     // simple per-project input model for new payment
     private class PaymentInput
     {
-        public DateTime Date { get; set; }
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
         public decimal Amount { get; set; }
         public EmployeeGroup? DetecatedTo { get; set; }
 
         public PaymentInput() { }
-        public PaymentInput(DateTime date, decimal amount, EmployeeGroup? dedicatedTo)
+        public PaymentInput(DateTime start, decimal amount, EmployeeGroup? dedicatedTo, DateTime? end = null)
         {
-            Date = date;
+            Start = start;
+            End = end ?? start;
             Amount = amount;
             DetecatedTo = dedicatedTo;
         }
@@ -204,8 +216,8 @@ else
             .OrderByDescending(p => p.Start)
             .ToListAsync();
 
-        // ensure paymentInputs entries exist
-        paymentInputs = projects.ToDictionary(p => p.Id, p => new PaymentInput(DateTime.Today, 0m, null));
+        // ensure paymentInputs entries exist (prefill with project period)
+        paymentInputs = projects.ToDictionary(p => p.Id, p => new PaymentInput(p.Start, 0m, null, p.End));
     }
 
     private void ToggleExpand(int projectId)
@@ -266,7 +278,8 @@ else
         var payment = new Payment
         {
             ProjectId = project.Id,
-            Date = input.Date,
+            Start = input.Start,
+            End = input.End,
             Amount = input.Amount,
             DetecatedTo = input.DetecatedTo
         };
@@ -284,8 +297,8 @@ else
                 target.Payments.Add(payment);
             }
 
-            // reset input
-            paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m, null);
+            // reset input (prefill with project period)
+            paymentInputs[project.Id] = new PaymentInput(project.Start, 0m, null, project.End);
             message = "Projektmittel hinzugefügt.";
             StateHasChanged();
         }
@@ -402,7 +415,8 @@ else
         editPaymentCopies[p.Id] = new Payment
         {
             Id = p.Id,
-            Date = p.Date,
+            Start = p.Start,
+            End = p.End,
             Amount = p.Amount,
             DetecatedTo = p.DetecatedTo,
             ProjectId = p.ProjectId
@@ -422,25 +436,27 @@ else
         {
             using var db = DbFactory.CreateDbContext();
             var dbItem = await db.Payments.FindAsync(id);
-            if (dbItem != null)
-            {
-                dbItem.Date = copy.Date;
-                dbItem.Amount = copy.Amount;
-                dbItem.DetecatedTo = copy.DetecatedTo;
-                await db.SaveChangesAsync();
-
-                foreach (var proj in projects)
+                if (dbItem != null)
                 {
-                    var idx = proj.Payments?.FindIndex(x => x.Id == id) ?? -1;
-                    if (idx >= 0)
+                    dbItem.Start = copy.Start;
+                    dbItem.End = copy.End;
+                    dbItem.Amount = copy.Amount;
+                    dbItem.DetecatedTo = copy.DetecatedTo;
+                    await db.SaveChangesAsync();
+
+                    foreach (var proj in projects)
                     {
-                        proj.Payments[idx].Date = dbItem.Date;
-                        proj.Payments[idx].Amount = dbItem.Amount;
-                        proj.Payments[idx].DetecatedTo = dbItem.DetecatedTo;
+                        var idx = proj.Payments?.FindIndex(x => x.Id == id) ?? -1;
+                        if (idx >= 0)
+                        {
+                            proj.Payments[idx].Start = dbItem.Start;
+                            proj.Payments[idx].End = dbItem.End;
+                            proj.Payments[idx].Amount = dbItem.Amount;
+                            proj.Payments[idx].DetecatedTo = dbItem.DetecatedTo;
+                        }
                     }
+                    message = "Projektmittel gespeichert.";
                 }
-                message = "Projektmittel gespeichert.";
-            }
         }
         catch (Exception ex)
         {

@@ -11,32 +11,29 @@
 <h3 class="text-primary-emphasis">Projektmittel</h3>
 <hr />
 <div class="mb-3">
-    <label class="form-label">Projekt
-    <select class="form-control mb-1" @bind="newPayment.ProjectId">
+    <label>Projekt</label>
+    <select class="form-control mb-2" value="@newPayment.ProjectId" @onchange="NewPaymentProjectChanged">
         <option value="0">-- auswählen --</option>
         @foreach (var pr in projects)
         {
             <option value="@pr.Id">@pr.Title</option>
         }
         </select>
-    </label>
-
-    <label class="form-label">Datum
-        <input type="date" class="form-control mb-1" @bind="newPayment.Date" />
-    </label>
-    <label class="form-label">Betrag
-        <input type="number" step="1" class="form-control mb-1" @bind="newPayment.Amount" />
-    </label>
-    <label class="form-label">Gewidmet
-    <select class="form-control mb-1" @bind="newPayment.DetecatedTo">
+    <label>Von</label>
+        <input type="date" class="form-control mb-2" @bind="newPayment.Start" />
+    <label>Bis</label>
+        <input type="date" class="form-control mb-2" @bind="newPayment.End" />
+    <label>Betrag</label>
+        <input type="number" step="1" class="form-control mb-2" @bind="newPayment.Amount" />
+    <label >Gewidmet</label>
+    <select class="form-control mb-2" @bind="newPayment.DetecatedTo">
         <option value="">-- keine Angabe --</option>
         @foreach (var g in Enum.GetValues<EmployeeGroup>())
         {
             <option value="@g">@g</option>
         }
         </select>
-    </label>
-    <button class="btn btn-primary" @onclick="AddNewPayment">Projektmittel hinzufügen</button>
+    <button class="btn btn-primary mt-2" @onclick="AddNewPayment">Projektmittel hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="mt-2 text-info">@message</div>
@@ -51,7 +48,7 @@ else
 {
     <table class="table table-striped">
         <thead>
-            <tr><th>Id</th><th>Projekt</th><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
+            <tr><th>Id</th><th>Projekt</th><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var p in payments)
@@ -68,7 +65,12 @@ else
                                 }
                             </select>
                         </td>
-                        <td><input type="date" class="form-control" @bind="editPaymentCopy.Date" /></td>
+                        <td>
+                            <input type="date" class="form-control mb-1" @bind="editPaymentCopy.Start" />
+                        </td>
+                        <td>
+                            <input type="date" class="form-control" @bind="editPaymentCopy.End" />
+                        </td>
                         <td><input type="number" step="1" class="form-control" @bind="editPaymentCopy.Amount" /></td>
                         <td>
                             <select class="form-control" @bind="editPaymentCopy.DetecatedTo">
@@ -91,7 +93,8 @@ else
                     <tr>
                         <td>@p.Id</td>
                         <td>@(p.Project?.Title ?? "-")</td>
-                        <td>@p.Date.ToShortDateString()</td>
+                        <td>@p.Start.ToShortDateString()</td>
+                        <td>@p.End.ToShortDateString()</td>
                         <td>@p.Amount.ToString("C")</td>
                         <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
                         <td>
@@ -200,7 +203,8 @@ else
     private class NewPaymentInputModel
     {
         public int ProjectId { get; set; }
-        public DateTime Date { get; set; } = DateTime.Today;
+        public DateTime Start { get; set; } = DateTime.Today;
+        public DateTime End { get; set; } = DateTime.Today;
         public decimal Amount { get; set; }
         public EmployeeGroup? DetecatedTo { get; set; }
     }
@@ -241,14 +245,33 @@ else
             .Include(p => p.ContractAssignments)
                 .ThenInclude(cp => cp.Contract)
                     .ThenInclude(c => c.Employee)
-            .OrderByDescending(p => p.Date)
+            .OrderByDescending(p => p.Start)
             .ToListAsync();
 
         contractInputs = payments.ToDictionary(p => p.Id, p => new ContractAssignInput());
 
         // ensure newPayment project default is set if possible
-        if (projects.Count > 0 && newPayment.ProjectId == 0)
-            newPayment.ProjectId = projects.First().Id;
+            if (projects.Count > 0 && newPayment.ProjectId == 0)
+            {
+                newPayment.ProjectId = projects.First().Id;
+                // prefill start/end from first project
+                newPayment.Start = projects.First().Start;
+                newPayment.End = projects.First().End;
+            }
+    }
+
+    private void NewPaymentProjectChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e?.Value?.ToString(), out var id))
+        {
+            newPayment.ProjectId = id;
+            var pr = projects.FirstOrDefault(p => p.Id == id);
+            if (pr != null)
+            {
+                newPayment.Start = pr.Start;
+                newPayment.End = pr.End;
+            }
+        }
     }
 
     private IEnumerable<Contract> AvailableContractsForPayment(Payment p)
@@ -354,7 +377,8 @@ else
             var toSave = new Payment
             {
                 ProjectId = newPayment.ProjectId,
-                Date = newPayment.Date,
+                Start = newPayment.Start,
+                End = newPayment.End,
                 Amount = newPayment.Amount,
                 DetecatedTo = newPayment.DetecatedTo
             };
@@ -369,7 +393,8 @@ else
                 contractInputs[saved.Id] = new ContractAssignInput();
             }
 
-            newPayment = new NewPaymentInputModel { Date = DateTime.Today };
+            // reset, keep project selection
+            newPayment = new NewPaymentInputModel { ProjectId = newPayment.ProjectId, Start = DateTime.Today, End = DateTime.Today };
             message = "Projektmittel hinzugefügt.";
         }
         catch (Exception ex)
@@ -385,7 +410,8 @@ else
         {
             Id = p.Id,
             ProjectId = p.ProjectId,
-            Date = p.Date,
+            Start = p.Start,
+            End = p.End,
             Amount = p.Amount,
             DetecatedTo = p.DetecatedTo,
             Project = p.Project
@@ -407,7 +433,8 @@ else
             if (dbItem != null)
             {
                 dbItem.ProjectId = editPaymentCopy.ProjectId;
-                dbItem.Date = editPaymentCopy.Date;
+                dbItem.Start = editPaymentCopy.Start;
+                dbItem.End = editPaymentCopy.End;
                 dbItem.Amount = editPaymentCopy.Amount;
                 dbItem.DetecatedTo = editPaymentCopy.DetecatedTo;
                 await db.SaveChangesAsync();
@@ -417,7 +444,8 @@ else
                 {
                     payments[idx].Project = projects.FirstOrDefault(pr => pr.Id == editPaymentCopy.ProjectId) ?? payments[idx].Project;
                     payments[idx].ProjectId = editPaymentCopy.ProjectId;
-                    payments[idx].Date = editPaymentCopy.Date;
+                    payments[idx].Start = editPaymentCopy.Start;
+                    payments[idx].End = editPaymentCopy.End;
                     payments[idx].Amount = editPaymentCopy.Amount;
                     payments[idx].DetecatedTo = editPaymentCopy.DetecatedTo;
                 }

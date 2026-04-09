@@ -27,7 +27,9 @@ namespace oedibud.Models
         public int ProjectId { get; set; }
         public Project? Project { get; set; }
 
-        public DateTime Date { get; set; } = DateTime.Today;
+        // Payment is now a period: Start .. End (Ablaufdatum)
+        public DateTime Start { get; set; } = DateTime.Today;
+        public DateTime End { get; set; } = DateTime.Today;
         public EmployeeGroup? DetecatedTo { get; set; } = null;
 
         [Column(TypeName = "decimal(18,2)")]

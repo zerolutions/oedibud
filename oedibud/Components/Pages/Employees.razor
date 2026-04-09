@@ -14,18 +14,17 @@
 <hr/>
 
 <div class="mb-3">
-    Name <input @bind="employee.Name" class="form-control mb-2" />
-    Eingestellt am<input type="date" @bind="employee.HireDate" class="form-control mb-2" />
-    Gruppe
+    <label>Name</label> <input @bind="employee.Name" class="form-control mb-2" />
+    <label>Eingestellt am</label><input type="date" @bind="employee.HireDate" class="form-control mb-2" />
+    <label>Gruppe</label>
     <select @bind="employee.Group" class="form-control mb-2">
         @foreach (var g in Enum.GetValues<EmployeeGroup>())
         {
             <option value="@g">@GetGroupName(g)</option>
         }
     </select>
-    Angerechnete Erfahrung (Monate)<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-2" />
-    Arbeitgeber Faktor<input type="number" @bind="employee.BruttoFactor" class="form-control mb-2" />
-    @* Erfahrung:<input type="number" @bind="employee.Level" class="form-control mb-1" /> *@
+    <label>Angerechnete Erfahrung (Monate)</label><input type="number" @bind="employee.ExperienceMonth" class="form-control mb-2" />
+    <label>Arbeitgeber Faktor</label><input type="number" @bind="employee.BruttoFactor" class="form-control mb-2" />
     <button type="button" class="btn btn-primary mt-2" @onclick="Add">Mitarbeiter hinzufügen</button>
 </div>
 

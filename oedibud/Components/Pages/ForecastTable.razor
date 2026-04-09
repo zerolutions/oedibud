@@ -106,8 +106,8 @@
 
                     var alloc = new decimal[Months];
 
-                    var rawStart = cp.Start ?? p.Date;
-                    var start = rawStart < p.Date ? p.Date : rawStart;
+                    var rawStart = cp.Start ?? p.Start;
+                    var start = rawStart < p.Start ? p.Start : rawStart;
                     var end = cp.End ?? c.End;
 
                     var startMonth = new DateTime(start.Year, start.Month, 1);
@@ -126,7 +126,7 @@
                         var month = Columns[m];
                         var monthStart = new DateTime(month.Year, month.Month, 1);
                         if (monthStart < startMonth || monthStart > endMonth) continue;
-                        if (monthStart < new DateTime(p.Date.Year, p.Date.Month, 1)) continue;
+                        if (monthStart < new DateTime(p.Start.Year, p.Start.Month, 1)) continue;
 
                         var need = monthlyCost[m] - paymentsAssigned[m];
                         if (need <= 0) continue;
@@ -190,7 +190,7 @@
                         Type = RowItem.RowType.ContractPayment,
                         EmployeeId = emp.Id,
                         ContractId = c.Id,
-                        Label = $"Payment {p.Id} ({p.Date:yyyy-MM}) - {p.Amount:C}",
+                        Label = $"Payment {p.Id} ({p.Start:yyyy-MM} - {p.End:yyyy-MM}) - {p.Amount:C}",
                         Values = allocValues
                     });
                 }

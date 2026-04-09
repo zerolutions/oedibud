@@ -105,7 +105,7 @@ else
                                             <tr><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
                                         </thead>
                                         <tbody>
-                                            @foreach (var cp in c.Payments.OrderByDescending(x => x.Payment?.Date))
+                                            @foreach (var cp in c.Payments.OrderByDescending(x => x.Payment?.Start))
                                             {
                                                 <tr>
                                                     @if (editingContractPaymentIds.Contains(cp.Id))
@@ -116,10 +116,10 @@ else
                                                     <td colspan="3">
                                                         <select class="form-control" @bind="editContractPaymentCopies[cp.Id].PaymentId">
                                                             @* <option value="0">-- auswählen --</option> *@
-                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@($"{cp?.Payment?.Date.ToShortDateString()} - {cp?.Payment?.Amount.ToString("C")}")</option>
+                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@($"{cp?.Payment?.Start.ToShortDateString()} - {cp?.Payment?.End.ToShortDateString()} ({cp?.Payment?.Amount.ToString("C")})")</option>
                                                             @foreach (var p in AvailablePaymentsForContract(c))
                                                             {
-                                                                <option value="@p.Id">@($"{p.Date.ToShortDateString()} - {p.Amount.ToString("C")}")</option>
+                                                                <option value="@p.Id">@($"{p.Start.ToShortDateString()} - {p.End.ToShortDateString()} ({p.Amount.ToString("C")})")</option>
                                                             }
                                                         </select>
                                                     </td>
@@ -133,7 +133,7 @@ else
                                                     }
                                                     else
                                                     {
-                                                        <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
+                                                        <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") - @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
                                                         <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
                                                         <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
                                                         <td>@cp.SharePercent</td>
@@ -152,7 +152,7 @@ else
                                                         <option value="0">-- auswählen --</option>
                                                         @foreach (var p in AvailablePaymentsForContract(c))
                                                         {
-                                                            <option value="@p.Id">@($"{p.Date.ToShortDateString()} - {p.Amount.ToString("C")}")</option>
+                                                            <option value="@p.Id">@($"{p.Start.ToShortDateString()} - {p.End.ToShortDateString()} ({p.Amount.ToString("C")})")</option>
                                                         }
                                                     </select>
                                                 </td>
@@ -242,7 +242,7 @@ else
     {
         using var db = DbFactory.CreateDbContext();
         employees = await db.Employees.OrderBy(e => e.Name).ToListAsync();
-        payments = await db.Payments.OrderByDescending(p => p.Date).ToListAsync();
+        payments = await db.Payments.OrderByDescending(p => p.Start).ToListAsync();
         contracts = await db.Contracts
             .Include(c => c.Employee)
             .Include(c => c.Payments)
