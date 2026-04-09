@@ -8,6 +8,35 @@
 
 <h3>Zahlungen</h3>
 
+<div class="mb-3">
+    <label class="form-label">Projekt</label>
+    <select class="form-control mb-1" @bind="newPayment.ProjectId">
+        <option value="0">-- auswählen --</option>
+        @foreach (var pr in projects)
+        {
+            <option value="@pr.Id">@pr.Title</option>
+        }
+    </select>
+
+    <label class="form-label">Datum</label>
+    <input type="date" class="form-control mb-1" @bind="newPayment.Date" />
+    <label class="form-label">Betrag</label>
+    <input type="number" step="0.01" class="form-control mb-1" @bind="newPayment.Amount" />
+    <label class="form-label">Gewidmet</label>
+    <select class="form-control mb-1" @bind="newPayment.DetecatedTo">
+        <option value="">-- keine Angabe --</option>
+        @foreach (var g in Enum.GetValues<EmployeeGroup>())
+        {
+            <option value="@g">@g</option>
+        }
+    </select>
+    <button class="btn btn-primary" @onclick="AddNewPayment">Hinzufügen</button>
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="mt-2 text-info">@message</div>
+    }
+</div>
+
 @if (payments.Count == 0)
 {
     <p>Keine Zahlungen vorhanden.</p>
@@ -16,22 +45,57 @@ else
 {
     <table class="table table-striped">
         <thead>
-            <tr><th>Id</th><th>Datum</th><th>Betrag</th><th>Projekt</th><th>Gewidmet</th><th></th></tr>
+            <tr><th>Id</th><th>Projekt</th><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var p in payments)
             {
-                <tr>
-                    <td>@p.Id</td>
-                    <td>@p.Date.ToShortDateString()</td>
-                    <td>@p.Amount.ToString("C")</td>
-                    <td>@(p.Project?.Title ?? "-")</td>
-                    <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" :  "Anzeigen")</button>
-                    </td>
-                </tr>
-                @if (expanded.Contains(p.Id))
+                if (editingPaymentId == p.Id)
+                {
+                    <tr>
+                        <td>@p.Id</td>
+                        <td>
+                            <select class="form-control" @bind="editPaymentCopy.ProjectId">
+                                @foreach (var pr in projects)
+                                {
+                                    <option value="@pr.Id">@pr.Title</option>
+                                }
+                            </select>
+                        </td>
+                        <td><input type="date" class="form-control" @bind="editPaymentCopy.Date" /></td>
+                        <td><input type="number" step="0.01" class="form-control" @bind="editPaymentCopy.Amount" /></td>
+                        <td>
+                            <select class="form-control" @bind="editPaymentCopy.DetecatedTo">
+                                <option value="">-- keine Angabe --</option>
+                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                {
+                                    <option value="@g">@g</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1" @onclick="() => SavePaymentEdit(p.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditPayment()">Abbrechen</button>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td>@p.Id</td>
+                        <td>@(p.Project?.Title ?? "-")</td>
+                        <td>@p.Date.ToShortDateString()</td>
+                        <td>@p.Amount.ToString("C")</td>
+                        <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPaymentRow(p)">Bearbeiten</button>
+                            <button class="btn btn-sm btn-danger me-1" @onclick="() => DeletePayment(p)">Löschen</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" :  "Anzeigen")</button>
+                        </td>
+                    </tr>
+                }
+
+                if (expanded.Contains(p.Id))
                 {
                     <tr>
                         <td colspan="6" class="p-0">
@@ -121,8 +185,24 @@ else
 @code {
     private List<Payment> payments = new();
     private List<Contract> contracts = new();
+    private List<Project> projects = new();
     private HashSet<int> expanded = new();
     private string message = string.Empty;
+
+    // new payment creation model for top form
+    private class NewPaymentInputModel
+    {
+        public int ProjectId { get; set; }
+        public DateTime Date { get; set; } = DateTime.Today;
+        public decimal Amount { get; set; }
+        public EmployeeGroup? DetecatedTo { get; set; }
+    }
+
+    private NewPaymentInputModel newPayment = new NewPaymentInputModel();
+
+    // inline edit for payments
+    private int? editingPaymentId = null;
+    private Payment editPaymentCopy = new Payment();
 
     private class ContractAssignInput
     {
@@ -145,6 +225,9 @@ else
         // load contracts with employee navigation
         contracts = await db.Contracts.Include(c => c.Employee).OrderByDescending(c => c.Start).ToListAsync();
 
+        // load projects for new-payment select
+        projects = await db.Projects.OrderByDescending(p => p.Start).ToListAsync();
+
         // load payments including existing contract assignments and contract->employee
         payments = await db.Payments
             .Include(p => p.Project)
@@ -155,6 +238,10 @@ else
             .ToListAsync();
 
         contractInputs = payments.ToDictionary(p => p.Id, p => new ContractAssignInput());
+
+        // ensure newPayment project default is set if possible
+        if (projects.Count > 0 && newPayment.ProjectId == 0)
+            newPayment.ProjectId = projects.First().Id;
     }
 
     private IEnumerable<Contract> AvailableContractsForPayment(Payment p)
@@ -231,7 +318,128 @@ else
                 var target = payments.FirstOrDefault(x => x.Id == paymentId);
                 if (target != null) target.ContractAssignments.RemoveAll(x => x.Id == contractPaymentId);
                 message = "Zuweisung entfernt.";
-                    Notifier.Notify();
+                Notifier.Notify();
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    // --- Payment create / edit / delete ---
+    private async Task AddNewPayment()
+    {
+        if (newPayment.ProjectId == 0)
+        {
+            message = "Bitte ein Projekt auswählen.";
+            return;
+        }
+        if (newPayment.Amount == 0m)
+        {
+            message = "Betrag muss größer als 0 sein.";
+            return;
+        }
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var toSave = new Payment
+            {
+                ProjectId = newPayment.ProjectId,
+                Date = newPayment.Date,
+                Amount = newPayment.Amount,
+                DetecatedTo = newPayment.DetecatedTo
+            };
+            db.Payments.Add(toSave);
+            await db.SaveChangesAsync();
+
+            var saved = await db.Payments.Include(p => p.Project).FirstOrDefaultAsync(p => p.Id == toSave.Id);
+            if (saved != null)
+            {
+                saved.ContractAssignments = new List<ContractPayment>();
+                payments.Insert(0, saved);
+                contractInputs[saved.Id] = new ContractAssignInput();
+            }
+
+            newPayment = new NewPaymentInputModel { Date = DateTime.Today };
+            message = "Zahlung hinzugefügt.";
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+    }
+
+    private void EditPaymentRow(Payment p)
+    {
+        editingPaymentId = p.Id;
+        editPaymentCopy = new Payment
+        {
+            Id = p.Id,
+            ProjectId = p.ProjectId,
+            Date = p.Date,
+            Amount = p.Amount,
+            DetecatedTo = p.DetecatedTo,
+            Project = p.Project
+        };
+    }
+
+    private void CancelEditPayment()
+    {
+        editingPaymentId = null;
+        editPaymentCopy = new Payment();
+    }
+
+    private async Task SavePaymentEdit(int id)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Payments.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.ProjectId = editPaymentCopy.ProjectId;
+                dbItem.Date = editPaymentCopy.Date;
+                dbItem.Amount = editPaymentCopy.Amount;
+                dbItem.DetecatedTo = editPaymentCopy.DetecatedTo;
+                await db.SaveChangesAsync();
+
+                var idx = payments.FindIndex(x => x.Id == id);
+                if (idx >= 0)
+                {
+                    payments[idx].Project = projects.FirstOrDefault(pr => pr.Id == editPaymentCopy.ProjectId) ?? payments[idx].Project;
+                    payments[idx].ProjectId = editPaymentCopy.ProjectId;
+                    payments[idx].Date = editPaymentCopy.Date;
+                    payments[idx].Amount = editPaymentCopy.Amount;
+                    payments[idx].DetecatedTo = editPaymentCopy.DetecatedTo;
+                }
+                message = "Zahlung gespeichert.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            CancelEditPayment();
+        }
+    }
+
+    private async Task DeletePayment(Payment p)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var item = await db.Payments.FindAsync(p.Id);
+            if (item != null)
+            {
+                db.Payments.Remove(item);
+                await db.SaveChangesAsync();
+                payments.RemoveAll(x => x.Id == p.Id);
+                contractInputs.Remove(p.Id);
+                message = "Zahlung gelöscht.";
             }
         }
         catch (Exception ex)
