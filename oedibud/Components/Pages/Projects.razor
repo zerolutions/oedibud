@@ -5,13 +5,15 @@
 @using oedibud.Data
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 
-<h3>Projekte</h3>
+<PageTitle>Projekte</PageTitle>
 
+<h3 class="text-primary-emphasis">Projekte</h3>
+<hr />
 <div class="mb-3">
-    Titel:<input @bind="project.Title" class="form-control mb-1" />
-    Projektstart:<input type="date" @bind="project.Start" class="form-control mb-1" />
-    Projektende:<input type="date" @bind="project.End" class="form-control mb-1" />
-    <button class="btn btn-primary" @onclick="AddProject">Projekt hinzufügen</button>
+    Titel<input @bind="project.Title" class="form-control mb-2" />
+    Projektstart<input type="date" @bind="project.Start" class="form-control mb-2" />
+    Projektende<input type="date" @bind="project.End" class="form-control mb-2" />
+    <button class="btn btn-primary mt-2" @onclick="AddProject">Projekt hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="mt-2 text-info">@message</div>
@@ -51,7 +53,7 @@ else
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveProject(editProjectCopy.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditProject()">Abbrechen</button>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                                @(expanded.Contains(p.Id) ? "Verstecken" : "Zahlung zuweisen")
+                                @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel zuweisen")
                             </button>
                         </td>
                         <td></td>
@@ -66,7 +68,7 @@ else
                             <button type="button" class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditProject(p)">Bearbeiten</button>
                             <button type="button" class="btn btn-sm btn-danger me-2" @onclick="@(a => DeleteProjectAndPayments(@p))">Löschen</button>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                                @(expanded.Contains(p.Id) ? "Verstecken" : "Zahlung zuweisen")
+                                @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel zuweisen")
                             </button>
                         </td>
                     }
@@ -94,7 +96,7 @@ else
                                                     @if (editingPaymentIds.Contains(pay.Id))
                                                     {
                                                         <td><input type="date" class="form-control" @bind="editPaymentCopies[pay.Id].Date" /></td>
-                                                        <td><input type="number" step="0.01" class="form-control" @bind="editPaymentCopies[pay.Id].Amount" /></td>
+                                                        <td><input type="number" step="1" class="form-control" @bind="editPaymentCopies[pay.Id].Amount" /></td>
                                                         <td>
                                                             <select class="form-control" @bind="editPaymentCopies[pay.Id].DetecatedTo">
                                                                 <option value="">-- keine Angabe --</option>
@@ -116,7 +118,7 @@ else
                                                         <td>@pay.DetecatedTo.ToString()</td>
                                                         <td>
                                                             <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(pay)">Bearbeiten</button>
-                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Zahlung löschen</button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeletePayment(p, pay)">Projektmittel löschen</button>
                                                         </td>
                                                     }
                                                 </tr>
@@ -134,7 +136,7 @@ else
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label">Betrag</label>
-                                            <input type="number" step="0.01" class="form-control" @bind="paymentInputs[p.Id].Amount" />
+                                            <input type="number" step="1" class="form-control" @bind="paymentInputs[p.Id].Amount" />
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label>">Gewidmet</label>
@@ -284,7 +286,7 @@ else
 
             // reset input
             paymentInputs[project.Id] = new PaymentInput(DateTime.Today, 0m, null);
-            message = "Zahlung hinzugefügt.";
+            message = "Projektmittel hinzugefügt.";
             StateHasChanged();
         }
         catch (Exception ex)
@@ -328,7 +330,7 @@ else
             {
                 target.Payments.RemoveAll(p => p.Id == payment.Id);
             }
-            message = "Zahlung gelöscht.";
+            message = "Projektmittel gelöscht.";
         }
         catch (Exception ex)
         {
@@ -437,7 +439,7 @@ else
                         proj.Payments[idx].DetecatedTo = dbItem.DetecatedTo;
                     }
                 }
-                message = "Zahlung gespeichert.";
+                message = "Projektmittel gespeichert.";
             }
         }
         catch (Exception ex)

@@ -11,14 +11,10 @@
 @code {
     private int Months = 12;
     private DateTime StartMonth = new DateTime(DateTime.Today.Year, 1, 1);
-    public async Task NextYear()
+
+    public async Task NextMonth(int m)
     {
-        StartMonth = StartMonth.AddMonths(12);
-        await OnInitializedAsync();
-    }
-    public async Task PrevYear()
-    {
-        StartMonth = StartMonth.AddMonths(-12);
+        StartMonth = StartMonth.AddMonths(m);
         await OnInitializedAsync();
     }
 
@@ -226,15 +222,18 @@
             Notifier.OnChange -= _onChangeHandler;
     }
 }
+<h3 class="text-primary-emphasis">Prognose</h3>
+<hr />
+<div style="display:flex; justify-content:center">
+    <button type="button" class="btn btn-outline-secondary" @onclick="@(e => NextMonth(-3))">⬅️ 3 Monate</button>
+<h4 class="m-2">@StartMonth.ToShortDateString() - @StartMonth.AddMonths(@Months).AddDays(-1).ToShortDateString()</h4>
+    <button type="button" class="btn btn-outline-secondary" @onclick="@(e => NextMonth(3))">3 Monate ➡️</button>
+</div>
 
-<h3>Prognose (@StartMonth.ToShortDateString() - @StartMonth.AddMonths(@Months).AddDays(-1).ToShortDateString())</h3>
-<button type="button" class="btn" @onclick="@PrevYear">zurück</button>
-<button type="button" class="btn" @onclick="@NextYear">weiter</button>
-
-<table class="table table-sm table-bordered">
+<table class="table table-sm table-bordered mt-3">
     <thead>
         <tr>
-            <th>Person / Vertrag / Zahlung</th>
+            <th>Person / Vertrag / Projektmittel</th>
             @foreach (var col in Columns)
             {
                 <th>@col.ToString("MM/yyyy")</th>

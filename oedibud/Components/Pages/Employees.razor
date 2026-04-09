@@ -8,20 +8,23 @@
 @using oedibud.Data
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 
-<h3>Mitarbeiter</h3>
+<PageTitle>Mitarbeiter</PageTitle>
+
+<h3 class="text-primary-emphasis">Mitarbeiter</h3>
+<hr/>
 
 <div class="mb-3">
-    Name <input @bind="employee.Name" class="form-control mb-1" />
-    Eingestellt am<input type="date" @bind="employee.HireDate" class="form-control mb-1" />
+    Name <input @bind="employee.Name" class="form-control mb-2" />
+    Eingestellt am<input type="date" @bind="employee.HireDate" class="form-control mb-2" />
     Gruppe
-    <select @bind="employee.Group" class="form-control mb-1">
+    <select @bind="employee.Group" class="form-control mb-2">
         @foreach (var g in Enum.GetValues<EmployeeGroup>())
         {
             <option value="@g">@GetGroupName(g)</option>
         }
     </select>
-    Angerechnete Erfahrung (Monate)<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-1" />
-    Arbeitgeber Faktor<input type="number" @bind="employee.BruttoFactor" class="form-control mb-1" />
+    Angerechnete Erfahrung (Monate)<input type="number" @bind="employee.ExperienceMonth" class="form-control mb-2" />
+    Arbeitgeber Faktor<input type="number" @bind="employee.BruttoFactor" class="form-control mb-2" />
     @* Erfahrung:<input type="number" @bind="employee.Level" class="form-control mb-1" /> *@
     <button type="button" class="btn btn-primary mt-2" @onclick="Add">Mitarbeiter hinzufügen</button>
 </div>
@@ -78,7 +81,7 @@ else
                         <td>
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Vertrag zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge zuweisen")</button>
                         </td>
                     }
                     else
@@ -93,7 +96,7 @@ else
                         <td>
                             <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
                             <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Vertrag zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge zuweisen")</button>
                         </td>
                     }
                 </tr>
@@ -105,7 +108,7 @@ else
                             <div class="p-3 ">
                                 @if (!contractsByEmployee.ContainsKey(e.Id) || contractsByEmployee[e.Id].Count == 0)
                                 {
-                            <em>Keine Verträge zugewiesen</em>
+                            <em>Keine Arbeitsverträge zugewiesen</em>
                     }
                                     <table class="table-sm">
                                         <thead>
@@ -119,7 +122,7 @@ else
                                                     {
                                                         <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].Start" /></td>
                                                         <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].End" /></td>
-                                                        <td><input type="number" step="0.01" class="form-control" @bind="editContractCopies[c.Id].Fte" /></td>
+                                                        <td><input type="number" step="0.1" class="form-control" @bind="editContractCopies[c.Id].Fte" /></td>
                                                         <td>
                                                             <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContract(c.Id)">Speichern</button>
                                                             <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
@@ -144,7 +147,7 @@ else
                                             <td>
                                                 <input type="date" class="form-control" @bind="contractInputs[e.Id].End" />
                                             </td>
-                                                <td><input type="number" step="0.01" class="form-control" @bind="contractInputs[e.Id].Fte"/></td>
+                                                <td><input type="number" step="0.1" class="form-control" @bind="contractInputs[e.Id].Fte"/></td>
                                                 <td>
                                                 <button class="btn btn-success" @onclick="() => AddContractForEmployee(e.Id)">Hinzufügen</button>
 

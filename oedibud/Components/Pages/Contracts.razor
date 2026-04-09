@@ -6,8 +6,11 @@
 @using oedibud.Data
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 
-<h3>Verträge</h3>
+<PageTitle>Arbeitsverträge</PageTitle>
 
+
+<h3 class="text-primary-emphasis">Arbeitsverträge</h3>
+<hr />
 <div class="mb-3">
     <label>Mitarbeiter</label>
     <select class="form-control mb-2" @bind="newContract.EmployeeId">
@@ -25,9 +28,9 @@
     <InputDate class="form-control mb-2" @bind-Value="newContract.End" />
 
     <label>FTE</label>
-    <input type="number" step="0.01" class="form-control mb-2" @bind="newContract.Fte" />
+    <input type="number" step="0.1" class="form-control mb-2" @bind="newContract.Fte" />
 
-    <button class="btn btn-primary" @onclick="AddContract">Vertrag hinzufügen</button>
+    <button class="btn btn-primary mt-2" @onclick="AddContract">Vertrag hinzufügen</button>
 </div>
 
 @if (!string.IsNullOrEmpty(message))
@@ -39,7 +42,7 @@
 
 @if (contracts.Count == 0)
 {
-    <p>Keine Verträge vorhanden.</p>
+    <p>Keine Arbeitsverträge vorhanden.</p>
 }
 else
 {
@@ -64,11 +67,11 @@ else
                         <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
                         <td><input type="date" class="form-control" @bind="editContractCopy.Start" /></td>
                         <td><input type="date" class="form-control" @bind="editContractCopy.End" /></td>
-                        <td><input type="number" step="0.01" class="form-control" @bind="editContractCopy.Fte" /></td>
+                        <td><input type="number" step="0.1" class="form-control" @bind="editContractCopy.Fte" /></td>
                         <td>
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveContract(editContractCopy.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditContract()">Abbrechen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "Verstecken" : "Zahlung zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "Verstecken" : "Projektmittel zuweisen")</button>
                         </td>
                     }
                     else
@@ -80,7 +83,7 @@ else
                         <td>
                             <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditContractRow(c)">Bearbeiten</button>
                             <button class="btn btn-danger btn-sm me-2" @onclick="() => DeleteContract(c.Id)">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "Verstecken" : "Zahlung zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">@(expanded.Contains(c.Id) ? "Verstecken" : "Projektmittel zuweisen")</button>
 
                         </td>
                     }
@@ -90,10 +93,10 @@ else
                     <tr>
                         <td colspan="7" class="p-0 bg-dark-subtle">
                             <div class="p-3">
-                                @* <h6>Zugeordnete Zahlungen</h6> *@
+                                @* <h6>Zugeordnete Projektmittel</h6> *@
                                 @if (c.Payments == null || c.Payments.Count == 0)
                                 {
-                                    <div><em>Keine Zahlungen zugewiesen</em></div>
+                                    <div><em>Keine Projektmittel zugewiesen</em></div>
                                 }
                                 @* else
                                 { *@
@@ -172,10 +175,10 @@ else
                                 @* } *@
 
                                 @* <div class="border-top pt-2 mt-2">
-                                    <h6>Zahlung hinzufügen</h6>
+                                    <h6>Projektmittel hinzufügen</h6>
                                     <div class="row g-2 align-items-end">
                                         <div class="col-auto">
-                                            <label class="form-label">Zahlung</label>
+                                            <label class="form-label">Projektmittel</label>
                                             <select class="form-control" @bind="paymentInputs[c.Id].PaymentId">
                                                 <option value="0">-- auswählen --</option>
                                                 @foreach (var p in AvailablePaymentsForContract(c))
@@ -272,7 +275,7 @@ else
         if (!paymentInputs.TryGetValue(c.Id, out var input)) return;
         if (input.PaymentId == 0)
         {
-            message = "Bitte eine Zahlung auswählen.";
+            message = "Bitte eine Projektmittel auswählen.";
             return;
         }
         if (input.SharePercent < 0 || input.SharePercent > 100)
@@ -303,7 +306,7 @@ else
                 if (target != null) target.Payments.Add(loaded);
             }
 
-            message = "Zahlung zugewiesen.";
+            message = "Projektmittel zugewiesen.";
             paymentInputs[c.Id] = new ContractPaymentInput();
         }
         catch (Exception ex)

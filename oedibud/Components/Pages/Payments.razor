@@ -6,31 +6,37 @@
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 @inject oedibud.Services.DataChangeNotifier Notifier
 
-<h3>Zahlungen</h3>
+<PageTitle>Projektmittel</PageTitle>
 
+<h3 class="text-primary-emphasis">Projektmittel</h3>
+<hr />
 <div class="mb-3">
-    <label class="form-label">Projekt</label>
+    <label class="form-label">Projekt
     <select class="form-control mb-1" @bind="newPayment.ProjectId">
         <option value="0">-- auswählen --</option>
         @foreach (var pr in projects)
         {
             <option value="@pr.Id">@pr.Title</option>
         }
-    </select>
+        </select>
+    </label>
 
-    <label class="form-label">Datum</label>
-    <input type="date" class="form-control mb-1" @bind="newPayment.Date" />
-    <label class="form-label">Betrag</label>
-    <input type="number" step="0.01" class="form-control mb-1" @bind="newPayment.Amount" />
-    <label class="form-label">Gewidmet</label>
+    <label class="form-label">Datum
+        <input type="date" class="form-control mb-1" @bind="newPayment.Date" />
+    </label>
+    <label class="form-label">Betrag
+        <input type="number" step="1" class="form-control mb-1" @bind="newPayment.Amount" />
+    </label>
+    <label class="form-label">Gewidmet
     <select class="form-control mb-1" @bind="newPayment.DetecatedTo">
         <option value="">-- keine Angabe --</option>
         @foreach (var g in Enum.GetValues<EmployeeGroup>())
         {
             <option value="@g">@g</option>
         }
-    </select>
-    <button class="btn btn-primary" @onclick="AddNewPayment">Zahlung hinzufügen</button>
+        </select>
+    </label>
+    <button class="btn btn-primary" @onclick="AddNewPayment">Projektmittel hinzufügen</button>
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="mt-2 text-info">@message</div>
@@ -39,7 +45,7 @@
 
 @if (payments.Count == 0)
 {
-    <p>Keine Zahlungen vorhanden.</p>
+    <p>Keine Projektmittel vorhanden.</p>
 }
 else
 {
@@ -63,7 +69,7 @@ else
                             </select>
                         </td>
                         <td><input type="date" class="form-control" @bind="editPaymentCopy.Date" /></td>
-                        <td><input type="number" step="0.01" class="form-control" @bind="editPaymentCopy.Amount" /></td>
+                        <td><input type="number" step="1" class="form-control" @bind="editPaymentCopy.Amount" /></td>
                         <td>
                             <select class="form-control" @bind="editPaymentCopy.DetecatedTo">
                                 <option value="">-- keine Angabe --</option>
@@ -76,7 +82,7 @@ else
                         <td>
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SavePaymentEdit(p.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditPayment()">Abbrechen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Vertrag zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Arbeitsverträge zuweisen")</button>
                         </td>
                     </tr>
                 }
@@ -91,7 +97,7 @@ else
                         <td>
                             <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditPaymentRow(p)">Bearbeiten</button>
                             <button class="btn btn-sm btn-danger me-2" @onclick="() => DeletePayment(p)">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Vertrag zuweisen")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Arbeitsverträge zuweisen")</button>
                         </td>
                     </tr>
                 }
@@ -101,7 +107,7 @@ else
                     <tr>
                         <td colspan="6" class="p-0">
                             <div class="p-3">
-                                <h6>Zugeordnete Verträge</h6>
+                                <h6>Zugeordnete Arbeitsverträge</h6>
                                 @if (p.ContractAssignments == null || p.ContractAssignments.Count == 0)
                                 {
                                     <div><em>Keine Zuordnungen</em></div>
@@ -145,7 +151,7 @@ else
                                 }
 
                                 <div class="border-top pt-2 mt-2">
-                                    <h6>Vertrag zuweisen</h6>
+                                    <h6>Arbeitsverträge zuweisen</h6>
                                     <div class="row g-2 align-items-end">
                                         <div class="col-auto">
                                             <label class="form-label">Vertrag</label>
@@ -364,7 +370,7 @@ else
             }
 
             newPayment = new NewPaymentInputModel { Date = DateTime.Today };
-            message = "Zahlung hinzugefügt.";
+            message = "Projektmittel hinzugefügt.";
         }
         catch (Exception ex)
         {
@@ -415,7 +421,7 @@ else
                     payments[idx].Amount = editPaymentCopy.Amount;
                     payments[idx].DetecatedTo = editPaymentCopy.DetecatedTo;
                 }
-                message = "Zahlung gespeichert.";
+                message = "Projektmittel gespeichert.";
             }
         }
         catch (Exception ex)
@@ -440,7 +446,7 @@ else
                 await db.SaveChangesAsync();
                 payments.RemoveAll(x => x.Id == p.Id);
                 contractInputs.Remove(p.Id);
-                message = "Zahlung gelöscht.";
+                message = "Projektmittel gelöscht.";
             }
         }
         catch (Exception ex)
