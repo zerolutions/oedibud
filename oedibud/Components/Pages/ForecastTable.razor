@@ -27,6 +27,7 @@
         public int EmployeeId { get; set; }
         public int? ContractId { get; set; }
         public string Label { get; set; } = "";
+        public string Title { get; set; } = "";
         public decimal[] Values { get; set; } = Array.Empty<decimal>();
     }
 
@@ -57,6 +58,7 @@
         var contracts = await Db.Contracts
             .Include(c => c.Payments)
                 .ThenInclude(cp => cp.Payment)
+                    .ThenInclude(p => p.Project)
             .ToListAsync();
 
         // build rows
@@ -143,8 +145,9 @@
                 // contract row = negative costs + assigned payments
                 var arr = new decimal[Months];
                 var arr2 = new decimal[Months];
-                for (int m = 0; m < Months; m++){
-                    arr[m] = -monthlyCost[m]*emp.BruttoFactor; //+ paymentsAssigned[m];
+                for (int m = 0; m < Months; m++)
+                {
+                    arr[m] = -monthlyCost[m] * emp.BruttoFactor; //+ paymentsAssigned[m];
                     arr2[m] = arr[m] + paymentsAssigned[m];
                 }
 
@@ -169,7 +172,8 @@
                     Type = RowItem.RowType.Contract,
                     EmployeeId = emp.Id,
                     ContractId = c.Id,
-                    Label = $"Contract {c.Id} ({c.Start:yyyy-MM} - {c.End:yyyy-MM})",
+                    Label = $"{((emp.Name + " | ") ?? "")}(V-{c.Id}) {c.Start:MM.yyyy} - {c.End:MM.yyyy}",
+                    Title = $"ID {c.Id}",
                     Values = contractMonthValues[c.Id]
                 };
 
@@ -190,7 +194,8 @@
                         Type = RowItem.RowType.ContractPayment,
                         EmployeeId = emp.Id,
                         ContractId = c.Id,
-                        Label = $"Payment {p.Id} ({p.Start:yyyy-MM} - {p.End:yyyy-MM}) - {p.Amount:C}",
+                        Label = $"{((p.Project?.Title + " | ") ?? "")}(PM-{p.Id}) {cp.Payment?.Amount:C0} á {cp.SharePercent}%",
+                        Title = $"Projektmittel: {p.Start:MM.yyyy} - {p.End:MM.yyyy}, Zuweisung: {p.Start:MM.yyyy} - {p.End:MM.yyyy}", //ToDo Zuweisungsdatum
                         Values = allocValues
                     });
                 }
@@ -225,14 +230,17 @@
 <h3 class="text-primary-emphasis">Prognose</h3>
 <hr />
 <div style="display:flex; justify-content:center">
-    <button type="button" class="btn btn-outline-secondary" @onclick="@(e => NextMonth(-3))">⬅️ 3 Monate</button>
-<h4 class="m-2">@StartMonth.ToShortDateString() - @StartMonth.AddMonths(@Months).AddDays(-1).ToShortDateString()</h4>
-    <button type="button" class="btn btn-outline-secondary" @onclick="@(e => NextMonth(3))">3 Monate ➡️</button>
+    <button type="button" class="btn btn-sm btn-light" title="12 Monate zurück" @onclick="@(e => NextMonth(-12))">⬅️⬅️</button>
+    <button type="button" class="btn btn-sm btn-light ms-2" title="3 Monate zurück" @onclick="@(e => NextMonth(-3))">⬅️</button>
+    <h4 class="m-2">@StartMonth.ToShortDateString() - @StartMonth.AddMonths(@Months).AddDays(-1).ToShortDateString()</h4>
+    <button type="button" class="btn btn-sm btn-light me-2" title="3 Monate vorwärts" @onclick="@(e => NextMonth(3))">➡️</button>
+    <button type="button" class="btn btn-sm btn-light" title="12 Monate vorwärts" @onclick="@(e => NextMonth(12))">➡️➡️</button>
 </div>
 
-<table class="table table-sm table-bordered mt-3">
+<table class="table table-borderless mt-3 text-end">
     <thead>
         <tr>
+            <th />
             <th>Person / Vertrag / Projektmittel</th>
             @foreach (var col in Columns)
             {
@@ -247,14 +255,16 @@
             {
                 <tr class="table-primary">
                     <td>
-                        <button class="btn btn-link" @onclick="() => Toggle(row.EmployeeId)">
-                            @(Expanded.Contains(row.EmployeeId) ? "Verstecken" :  "Anzeigen")
+                        <button class="btn btn pb-0 pt-0" @onclick="() => Toggle(row.EmployeeId)">
+                            @(Expanded.Contains(row.EmployeeId) ? "-" : "+")
                         </button>
+                    </td>
+                    <td title="@row.Title">
                         @row.Label
                     </td>
                     @for (int i = 0; i < row.Values.Length; i++)
                     {
-                        <td>@row.Values[i].ToString("C")</td>
+                        <td>@row.Values[i].ToString("C0")</td>
                     }
                 </tr>
             }
@@ -262,10 +272,11 @@
             {
                 if (!Expanded.Contains(row.EmployeeId)) { continue; }
                 <tr class="table-secondary">
-                    <td style="padding-left:20px">@row.Label</td>
+                    <td class="table-primary" />
+                    <td title="@row.Title" style="padding-left:10px">@row.Label</td>
                     @for (int i = 0; i < row.Values.Length; i++)
                     {
-                        <td>@row.Values[i].ToString("C")</td>
+                        <td>@row.Values[i].ToString("C0")</td>
                     }
                 </tr>
             }
@@ -273,10 +284,11 @@
             {
                 if (!Expanded.Contains(row.EmployeeId)) { continue; }
                 <tr class="table-success">
-                    <td style="padding-left:40px">@row.Label</td>
+                    <td class="table-primary" />
+                    <td title="@row.Title" style="padding-left:20px">@row.Label</td>
                     @for (int i = 0; i < row.Values.Length; i++)
                     {
-                        <td>@row.Values[i].ToString("C")</td>
+                        <td>@row.Values[i].ToString("C0")</td>
                     }
                 </tr>
             }
@@ -284,11 +296,31 @@
     </tbody>
     <tfoot>
         <tr class="table-dark">
+            <td />
             <td>Gesamt</td>
             @for (int i = 0; i < Totals.Length; i++)
             {
-                <td>@Totals[i].ToString("C")</td>
+                <td>@Totals[i].ToString("C0")</td>
             }
         </tr>
     </tfoot>
+</table>
+
+<table class="table table-borderless mt-5 w-25">
+    <thead>
+        <tr>
+            <th>Legende</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr class="table-primary">
+            <td>Mitarbeiter (M)</td>
+        </tr>
+        <tr class="table-secondary">
+            <td>Vertrag (V)</td>
+        </tr>
+        <tr class="table-success">
+            <td>Projektmittel (PM)</td>
+        </tr>
+    </tbody>
 </table>
