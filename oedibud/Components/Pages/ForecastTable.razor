@@ -253,7 +253,7 @@
         {
             if (row.Type == RowItem.RowType.Employee)
             {
-                <tr class="table-primary">
+                <tr class="table-primary fw-bold">
                     <td>
                         <button class="btn btn pb-0 pt-0" @onclick="() => Toggle(row.EmployeeId)">
                             @(Expanded.Contains(row.EmployeeId) ? "-" : "+")
@@ -295,7 +295,7 @@
         }
     </tbody>
     <tfoot>
-        <tr class="table-dark">
+        <tr class="table-dark fw-bold">
             <td />
             <td>Gesamt</td>
             @for (int i = 0; i < Totals.Length; i++)
@@ -320,7 +320,7 @@
             <td>Vertrag (V)</td>
         </tr>
         <tr class="table-success">
-            <td>Projektmittel (PM)</td>
+            <td>Projekt / Projektmittel (PM)</td>
         </tr>
     </tbody>
 </table>
