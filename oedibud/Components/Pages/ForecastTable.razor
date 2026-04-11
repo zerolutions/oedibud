@@ -15,7 +15,10 @@
     public async Task NextMonth(int m)
     {
         StartMonth = StartMonth.AddMonths(m);
-        await OnInitializedAsync();
+        Columns.Clear();
+        for (int i = 0; i < Months; i++)
+            Columns.Add(StartMonth.AddMonths(i));
+        await LoadDataAsync();
     }
 
     private List<DateTime> Columns = new();
@@ -67,11 +70,12 @@
 
         foreach (var emp in employees.OrderBy(e => e.Name))
         {
+            Expanded.Add(emp.Id);
             var empRow = new RowItem
             {
                 Type = RowItem.RowType.Employee,
                 EmployeeId = emp.Id,
-                Label = emp.Name,
+                Label = emp.Name + " | " + emp.Group,
                 Values = new decimal[Months]
             };
 
@@ -173,8 +177,8 @@
                     Type = RowItem.RowType.Contract,
                     EmployeeId = emp.Id,
                     ContractId = c.Id,
-                    Label = $"{((emp.Name + " | ") ?? "")}(V-{c.Id}) {c.Start:MM.yyyy} - {c.End:MM.yyyy}",
-                    Title = $"ID {c.Id}",
+                    Label = $"{c.Start:MMM yy} - {c.End:MMM yy}",
+                    Title = $"Vertrags-ID {c.Id}",
                     Values = contractMonthValues[c.Id]
                 };
 
@@ -195,8 +199,8 @@
                         Type = RowItem.RowType.ContractPayment,
                         EmployeeId = emp.Id,
                         ContractId = c.Id,
-                        Label = $"{((p.Project?.Title + " | ") ?? "")}(PM-{p.Id}) {cp.Payment?.Amount:C0} á {cp.SharePercent}%",
-                        Title = $"Projektmittel: {p.Start:MM.yyyy} - {p.End:MM.yyyy}, Zuweisung: {p.Start:MM.yyyy} - {p.End:MM.yyyy}", //ToDo Zuweisungsdatum
+                        Label = $"{((p.Project?.Title + " | ") ?? "")} {cp.SharePercent}% von {cp.Payment?.Amount:C0}",
+                        Title = $"Projekt-ID {p.ProjectId} | Projektmittel-ID {p.Id} | Gewidmet {p.DetecatedTo} | Projektmittel: {p.Start:MMM yy} - {p.End:MMM yy} | Vertragszuweisung: {cp.Start:MMM yy} - {cp.End:MMM yy}", //ToDo Zuweisungsdatum
                         Values = allocValues
                     });
                 }
@@ -233,7 +237,7 @@
 <div style="display:flex; justify-content:center">
     <button type="button" class="btn btn-sm btn-light" title="12 Monate zurück" @onclick="@(e => NextMonth(-12))">⬅️⬅️</button>
     <button type="button" class="btn btn-sm btn-light ms-2" title="3 Monate zurück" @onclick="@(e => NextMonth(-3))">⬅️</button>
-    <h4 class="m-2">@StartMonth.ToShortDateString() - @StartMonth.AddMonths(@Months).AddDays(-1).ToShortDateString()</h4>
+    <h4 class="m-2">@StartMonth.ToString("MMM yy") - @StartMonth.AddMonths(@Months).AddDays(-1).ToString("MMM yy")</h4>
     <button type="button" class="btn btn-sm btn-light me-2" title="3 Monate vorwärts" @onclick="@(e => NextMonth(3))">➡️</button>
     <button type="button" class="btn btn-sm btn-light" title="12 Monate vorwärts" @onclick="@(e => NextMonth(12))">➡️➡️</button>
 </div>
@@ -242,10 +246,10 @@
     <thead>
         <tr>
             <th />
-            <th>Person / Vertrag / Projektmittel</th>
+            <th></th>
             @foreach (var col in Columns)
             {
-                <th>@col.ToString("MM/yyyy")</th>
+                <th>@col.ToString("MMM yy")</th>
             }
         </tr>
     </thead>
@@ -315,13 +319,13 @@
     </thead>
     <tbody>
         <tr class="table-primary">
-            <td>Mitarbeiter (M)</td>
+            <td class="fw-bold">Mitarbeiter | Gruppe</td>
         </tr>
         <tr class="table-secondary">
-            <td>Vertrag (V)</td>
+            <td>Vertragslaufzeit</td>
         </tr>
         <tr class="table-success">
-            <td>Projekt / Projektmittel (PM)</td>
+            <td>Projekt | Anteil an Projektmittelsumme</td>
         </tr>
     </tbody>
 </table>
