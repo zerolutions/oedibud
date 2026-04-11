@@ -20,7 +20,5 @@ namespace oedibud.Models
         
         // Navigation: assignments to contracts (many-to-many with extra fields)
         public List<ContractPayment> ContractPayments { get; set; } = new();
-
-        // Navigation: assignments to employees removed (direct employee assignments not supported)
     }
 }

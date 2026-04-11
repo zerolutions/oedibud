@@ -4,7 +4,7 @@
 @using oedibud.Services
 @using Microsoft.EntityFrameworkCore
 @using System.Linq
-@inject BudgetDbContext Db
+@inject IDbContextFactory<BudgetDbContext> DbFactory
 @inject TvLSalaryService TvL
 @inject oedibud.Services.DataChangeNotifier Notifier
 
@@ -53,9 +53,10 @@
 
     private async Task LoadDataAsync()
     {
-        // load data
-        var employees = await Db.Employees.ToListAsync();
-        var contracts = await Db.Contracts
+        // load data from a fresh DbContext so we see external changes
+        using var db = DbFactory.CreateDbContext();
+        var employees = await db.Employees.ToListAsync();
+        var contracts = await db.Contracts
             .Include(c => c.ContractPayments)
                 .ThenInclude(cp => cp.Payment)
                     .ThenInclude(p => p.Project)
@@ -128,7 +129,7 @@
                         var month = Columns[m];
                         var monthStart = new DateTime(month.Year, month.Month, 1);
                         if (monthStart < startMonth || monthStart > endMonth) continue;
-                        if (monthStart < new DateTime(p.Start.Year, p.Start.Month, 1) || ) continue;
+                        if (monthStart < new DateTime(p.Start.Year, p.Start.Month, 1)) continue;
 
                         var need = monthlyCost[m] - paymentsAssigned[m];
                         if (need <= 0) continue;
