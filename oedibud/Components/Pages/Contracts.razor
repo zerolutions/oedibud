@@ -94,7 +94,7 @@ else
                         <td colspan="7" class="p-0 bg-dark-subtle">
                             <div class="p-3">
                                 @* <h6>Zugeordnete Projektmittel</h6> *@
-                                @if (c.Payments == null || c.Payments.Count == 0)
+                                @if (c.ContractPayments == null || c.ContractPayments.Count == 0)
                                 {
                                     <div><em>Keine Projektmittel zugewiesen</em></div>
                                 }
@@ -105,7 +105,7 @@ else
                                             <tr><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
                                         </thead>
                                         <tbody>
-                                            @foreach (var cp in c.Payments.OrderByDescending(x => x.Payment?.Start))
+                                            @foreach (var cp in c.ContractPayments.OrderByDescending(x => x.Payment?.Start))
                                             {
                                                 <tr>
                                                     @if (editingContractPaymentIds.Contains(cp.Id))
@@ -245,7 +245,7 @@ else
         payments = await db.Payments.OrderByDescending(p => p.Start).ToListAsync();
         contracts = await db.Contracts
             .Include(c => c.Employee)
-            .Include(c => c.Payments)
+            .Include(c => c.ContractPayments)
                 .ThenInclude(cp => cp.Payment)
             .OrderByDescending(c => c.Start)
             .ToListAsync();
@@ -257,7 +257,7 @@ else
     {
         // payments that match employee group or have no dedicated group and not already assigned to this contract
         var empGroup = c.Employee?.Group;
-        var assignedIds = c.Payments?.Select(x => x.PaymentId).ToHashSet() ?? new HashSet<int>();
+        var assignedIds = c.ContractPayments?.Select(x => x.PaymentId).ToHashSet() ?? new HashSet<int>();
         return payments.Where(p => !assignedIds.Contains(p.Id) && (p.DetecatedTo == null || (empGroup != null && p.DetecatedTo == empGroup)));
     }
 
@@ -303,7 +303,7 @@ else
             if (loaded != null)
             {
                 var target = contracts.FirstOrDefault(x => x.Id == c.Id);
-                if (target != null) target.Payments.Add(loaded);
+                if (target != null) target.ContractPayments.Add(loaded);
             }
 
             message = "Projektmittel zugewiesen.";
@@ -326,7 +326,7 @@ else
                 db.ContractPayments.Remove(item);
                 await db.SaveChangesAsync();
                 var target = contracts.FirstOrDefault(c => c.Id == contractId);
-                if (target != null) target.Payments.RemoveAll(x => x.Id == contractPaymentId);
+                if (target != null) target.ContractPayments.RemoveAll(x => x.Id == contractPaymentId);
                 message = "Zuweisung entfernt.";
             }
         }
@@ -493,19 +493,19 @@ else
                 // update local model
                 foreach (var c in contracts)
                 {
-                    var idx = c.Payments?.FindIndex(x => x.Id == id) ?? -1;
+                    var idx = c.ContractPayments?.FindIndex(x => x.Id == id) ?? -1;
                     if (idx >= 0)
                     {
-                        c.Payments[idx].SharePercent = dbItem.SharePercent;
-                        c.Payments[idx].Start = dbItem.Start;
-                        c.Payments[idx].End = dbItem.End;
-                        c.Payments[idx].PaymentId = dbItem.PaymentId;
+                        c.ContractPayments[idx].SharePercent = dbItem.SharePercent;
+                        c.ContractPayments[idx].Start = dbItem.Start;
+                        c.ContractPayments[idx].End = dbItem.End;
+                        c.ContractPayments[idx].PaymentId = dbItem.PaymentId;
 
                         // update navigation property for UI by loading the updated ContractPayment including its Payment
                         var loadedCp = await db.ContractPayments.Include(x => x.Payment).FirstOrDefaultAsync(x => x.Id == id);
                         if (loadedCp != null)
                         {
-                            c.Payments[idx].Payment = loadedCp.Payment;
+                            c.ContractPayments[idx].Payment = loadedCp.Payment;
                         }
                     }
                 }

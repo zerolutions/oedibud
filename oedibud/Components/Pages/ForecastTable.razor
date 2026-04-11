@@ -56,7 +56,7 @@
         // load data
         var employees = await Db.Employees.ToListAsync();
         var contracts = await Db.Contracts
-            .Include(c => c.Payments)
+            .Include(c => c.ContractPayments)
                 .ThenInclude(cp => cp.Payment)
                     .ThenInclude(p => p.Project)
             .ToListAsync();
@@ -101,7 +101,7 @@
                 var perPaymentAlloc = new Dictionary<int, decimal[]>();
 
                 // allocate each contract payment greedily starting at cp.Start (or payment date)
-                foreach (var cp in c.Payments)
+                foreach (var cp in c.ContractPayments)
                 {
                     var p = cp.Payment;
                     if (p == null) continue;
@@ -128,7 +128,7 @@
                         var month = Columns[m];
                         var monthStart = new DateTime(month.Year, month.Month, 1);
                         if (monthStart < startMonth || monthStart > endMonth) continue;
-                        if (monthStart < new DateTime(p.Start.Year, p.Start.Month, 1)) continue;
+                        if (monthStart < new DateTime(p.Start.Year, p.Start.Month, 1) || ) continue;
 
                         var need = monthlyCost[m] - paymentsAssigned[m];
                         if (need <= 0) continue;
@@ -180,7 +180,7 @@
                 Rows.Add(crow);
 
                 // add payment rows (show per-contract allocations computed earlier)
-                foreach (var cp in c.Payments)
+                foreach (var cp in c.ContractPayments)
                 {
                     var p = cp.Payment;
                     if (p == null) continue;

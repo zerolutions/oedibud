@@ -36,7 +36,7 @@ namespace oedibud.Models
         public decimal Amount { get; set; }
         
         // Navigation: assignments to contracts (many-to-many with extra fields)
-        public List<ContractPayment> ContractAssignments { get; set; } = new();
+        public List<ContractPayment> ContractPayments { get; set; } = new();
 
         // Navigation: assignments to employees removed (direct employee assignments not supported)
     }

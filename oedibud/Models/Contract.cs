@@ -15,7 +15,7 @@ public class Contract
     public float Fte { get; set; }
 
     // Navigation: payments assigned to this contract (many-to-many via ContractPayment)
-    public List<ContractPayment> Payments { get; set; } = new();
+    public List<ContractPayment> ContractPayments { get; set; } = new();
 
 
 }
