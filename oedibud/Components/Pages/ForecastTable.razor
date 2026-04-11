@@ -1,4 +1,5 @@
 @using Blazorise
+@using System.Diagnostics
 @using oedibud.Data
 @using oedibud.Models
 @using oedibud.Services
@@ -14,6 +15,7 @@
 
     public async Task NextMonth(int m)
     {
+        Debug.WriteLine("NextMonthClicked");
         StartMonth = StartMonth.AddMonths(m);
         Columns.Clear();
         for (int i = 0; i < Months; i++)
@@ -37,7 +39,7 @@
     private List<RowItem> Rows = new();
     private HashSet<int> Expanded = new();
     private decimal[] Totals = Array.Empty<decimal>();
-    private Dictionary<int, Dictionary<int, decimal[]>>? _perContractPaymentAlloc = null;
+    private Dictionary<int, Dictionary<int, decimal[]>>? perContractPaymentAlloc = null;
 
     private Action? _onChangeHandler;
 
@@ -84,26 +86,37 @@
 
             // compute per month contract cost and payments
             var contractMonthValues = new Dictionary<int, decimal[]>();
-            _perContractPaymentAlloc ??= new Dictionary<int, Dictionary<int, decimal[]>>();
             var empMonthValues = new Dictionary<int, decimal[]>();
+            perContractPaymentAlloc = new Dictionary<int, Dictionary<int, decimal[]>>();
 
             foreach (var c in empContracts)
             {
-                // positive monthly cost per month
+                // helper to compute monthly cost for any month (including months outside the visible Columns range)
+                decimal MonthlyCostForMonth(DateTime month)
+                {
+                    var monthStart = new DateTime(month.Year, month.Month, 1);
+                    if (monthStart < new DateTime(c.Start.Year, c.Start.Month, 1) || monthStart > new DateTime(c.End.Year, c.End.Month, 1))
+                        return 0m;
+                    int level = emp.GetLevelAt(monthStart);
+                    var sal = TvL.GetSalary(emp.Group, level);  
+                    return sal * (decimal)c.Fte;
+                }
+
+                // positive monthly cost per visible month (cached for rendering/indexing)
                 var monthlyCost = new decimal[Months];
                 for (int m = 0; m < Months; m++)
                 {
-                    var month = Columns[m];
-                    if (month < new DateTime(c.Start.Year, c.Start.Month, 1) || month > new DateTime(c.End.Year, c.End.Month, 1))
-                        continue;
-
-                    int level = emp.GetLevelAt(month);
-                    var sal = TvL.GetSalary(emp.Group, level);
-                    monthlyCost[m] = sal * (decimal)c.Fte;
+                    monthlyCost[m] = MonthlyCostForMonth(Columns[m]);
                 }
 
                 var paymentsAssigned = new decimal[Months];
                 var perPaymentAlloc = new Dictionary<int, decimal[]>();
+
+                // dictionary to track assigned amounts per month across the whole allocation range (including months before the visible window)
+                var assignedByMonth = new Dictionary<DateTime, decimal>();
+                // initialize visible months
+                foreach (var col in Columns)
+                    assignedByMonth[new DateTime(col.Year, col.Month, 1)] = 0m;
 
                 // allocate each contract payment greedily starting at cp.Start (or payment date)
                 foreach (var cp in c.ContractPayments)
@@ -115,7 +128,8 @@
 
                     var rawStart = cp.Start ?? p.Start;
                     var start = rawStart < p.Start ? p.Start : rawStart;
-                    var end = cp.End ?? c.End;
+                    var rawEnd = cp.End ?? p.End;
+                    var end = rawEnd > p.End ? p.End : rawEnd;
 
                     var startMonth = new DateTime(start.Year, start.Month, 1);
                     var endMonth = new DateTime(end.Year, end.Month, 1);
@@ -126,46 +140,79 @@
                         continue;
                     }
 
-                    var remaining = (p.Amount * cp.SharePercent) / 100m;
+                    var remaining = (p.Amount * cp.SharePercent * emp.BruttoFactor) / 100m;
 
-                    for (int m = 0; m < Months && remaining > 0; m++)
+                    // iterate month-by-month across the full allocation period. This ensures payments that fall
+                    // into months before the visible Columns are consumed first (kumuliert) so the first visible
+                    // month only contains the remaining amount.
+                    for (var month = startMonth; month <= endMonth && remaining > 0; month = month.AddMonths(1))
                     {
-                        var month = Columns[m];
-                        var monthStart = new DateTime(month.Year, month.Month, 1);
-                        if (monthStart < startMonth || monthStart > endMonth) continue;
-                        if (monthStart < new DateTime(p.Start.Year, p.Start.Month, 1)) continue;
-
-                        var need = monthlyCost[m] - paymentsAssigned[m];
+                        var mStart = new DateTime(month.Year, month.Month, 1);
+                        var alreadyAssigned = assignedByMonth.TryGetValue(mStart, out var a) ? a : 0m;
+                        var need = MonthlyCostForMonth(mStart) - alreadyAssigned;
                         if (need <= 0) continue;
 
                         var take = Math.Min(need, remaining);
-                        paymentsAssigned[m] += take;
-                        alloc[m] += take;
+
+                        // if this month is visible, record into the alloc array and paymentsAssigned
+                        int visIndex = Columns.FindIndex(d => d.Year == mStart.Year && d.Month == mStart.Month);
+                        if (visIndex >= 0)
+                        {
+                            paymentsAssigned[visIndex] += take;
+                            alloc[visIndex] += take;
+                        }
+
+                        // always update assignedByMonth so earlier months consume amounts
+                        assignedByMonth[mStart] = alreadyAssigned + take;
+
                         remaining -= take;
                     }
 
                     perPaymentAlloc[cp.Id] = alloc;
+
                 }
 
                 // contract row = negative costs + assigned payments
                 var arr = new decimal[Months];
-                var arr2 = new decimal[Months];
+                // var arr2 = new decimal[Months];
                 for (int m = 0; m < Months; m++)
                 {
-                    arr[m] = -monthlyCost[m] * emp.BruttoFactor; //+ paymentsAssigned[m];
-                    arr2[m] = arr[m] + paymentsAssigned[m];
+                    arr[m] = -monthlyCost[m]; //+ paymentsAssigned[m];
+                    // arr2[m] = arr[m] + paymentsAssigned[m];
                 }
 
                 contractMonthValues[c.Id] = arr;
-                empMonthValues[c.Id] = arr2;
-                _perContractPaymentAlloc[c.Id] = perPaymentAlloc;
+                perContractPaymentAlloc[c.Id] = perPaymentAlloc;
+                // foreach (var kvp in perPaymentAlloc)
+                // {
+                //     Debug.WriteLine($"perPaymentAlloc Key: {kvp.Key}, Values: {string.Join(", ", kvp.Value)}");
+                // }
+                // foreach (var kvp in arr)
+                // {
+                //     Debug.WriteLine($"arr Values: {string.Join(", ", kvp)}");
+                // }
             }
 
             // fill employee totals as saldiert (netto): sum of contract rows (which already contain negative costs + assigned payments)
-            for (int m = 0; m < Months; m++)
+            foreach(var p in perContractPaymentAlloc)
             {
-                empRow.Values[m] = empMonthValues.Values.Sum(a => a[m]);
+                foreach (var monthValues in p.Value)
+                {
+                    for (int i = 0; i < Months; i++)
+                    {
+                        empRow.Values[i] += monthValues.Value[i];
+                    }
+                }
             }
+            foreach (var monthValues in contractMonthValues)
+            {
+                for (int i = 0; i < Months; i++)
+                {
+                    empRow.Values[i] += monthValues.Value[i];
+                }
+            }
+
+            // Debug.WriteLine($"results Values: {string.Join(", ", empRow.Values)}");
 
             Rows.Add(empRow);
 
@@ -191,7 +238,7 @@
                     if (p == null) continue;
 
                     decimal[] allocValues = new decimal[Months];
-                    if (_perContractPaymentAlloc != null && _perContractPaymentAlloc.TryGetValue(c.Id, out var dict) && dict.TryGetValue(cp.Id, out var cpAlloc))
+                    if (perContractPaymentAlloc != null && perContractPaymentAlloc.TryGetValue(c.Id, out var dict) && dict.TryGetValue(cp.Id, out var cpAlloc))
                         allocValues = cpAlloc;
 
                     Rows.Add(new RowItem
@@ -236,9 +283,9 @@
 <hr />
 <div style="display:flex; justify-content:center">
     <button type="button" class="btn btn-sm btn-light" title="12 Monate zurück" @onclick="@(e => NextMonth(-12))">⬅️⬅️</button>
-    <button type="button" class="btn btn-sm btn-light ms-2" title="3 Monate zurück" @onclick="@(e => NextMonth(-3))">⬅️</button>
+    <button type="button" class="btn btn-sm btn-light ms-2" title="1 Monate zurück" @onclick="@(e => NextMonth(-1))">⬅️</button>
     <h4 class="m-2">@StartMonth.ToString("MMM yy") - @StartMonth.AddMonths(@Months).AddDays(-1).ToString("MMM yy")</h4>
-    <button type="button" class="btn btn-sm btn-light me-2" title="3 Monate vorwärts" @onclick="@(e => NextMonth(3))">➡️</button>
+    <button type="button" class="btn btn-sm btn-light me-2" title="1 Monate vorwärts" @onclick="@(e => NextMonth(1))">➡️</button>
     <button type="button" class="btn btn-sm btn-light" title="12 Monate vorwärts" @onclick="@(e => NextMonth(12))">➡️➡️</button>
 </div>
 
