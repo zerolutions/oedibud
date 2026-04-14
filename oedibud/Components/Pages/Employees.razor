@@ -121,7 +121,7 @@ else
                                                     {
                                                         <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].Start" /></td>
                                                         <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].End" /></td>
-                                                        <td><input type="number" step="0.1" class="form-control" @bind="editContractCopies[c.Id].Fte" /></td>
+                                                        <td><input type="number" step="1" min="0" max="100" class="form-control" @bind="editContractCopies[c.Id].FtePercent" /></td>
                                                         <td>
                                                             <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContract(c.Id)">Speichern</button>
                                                             <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
@@ -131,7 +131,7 @@ else
                                                     {
                                                         <td>@c.Start.ToShortDateString()</td>
                                                         <td>@c.End.ToShortDateString()</td>
-                                                        <td>@c.Fte</td>
+                                                        <td>@c.FtePercent</td>
                                                         <td>
                                                             <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContract(c)">Bearbeiten</button>
                                                             <button class="btn btn-sm btn-danger" @onclick="() => DeleteContract(c.Id)">Löschen</button>
@@ -146,7 +146,7 @@ else
                                             <td>
                                                 <input type="date" class="form-control" @bind="contractInputs[e.Id].End" />
                                             </td>
-                                                <td><input type="number" step="0.1" class="form-control" @bind="contractInputs[e.Id].Fte"/></td>
+                                                <td><input type="number" step="1" min="0" max="100" class="form-control" @bind="contractInputs[e.Id].FtePercent"/></td>
                                                 <td>
                                                 <button class="btn btn-success" @onclick="() => AddContractForEmployee(e.Id)">Hinzufügen</button>
 
@@ -178,7 +178,7 @@ else
     {
         public DateTime Start { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         public DateTime End { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1);
-        public float Fte { get; set; } = 1.0f;
+        public float FtePercent { get; set; } = 100f;
     }
     private Dictionary<int, ContractInput> contractInputs = new();
     private string message = "";
@@ -312,7 +312,7 @@ else
                 EmployeeId = employeeId,
                 Start = input.Start,
                 End = input.End,
-                Fte = input.Fte
+                FtePercent = input.FtePercent
             };
             db.Contracts.Add(toSave);
             await db.SaveChangesAsync();

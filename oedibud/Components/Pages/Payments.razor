@@ -114,10 +114,8 @@ else
                                 {
                                     <div><em>Keine Arbeitsverträge zugewiesen</em></div>
                                 }
-                                @* else
-                                { *@
                                 <table class="table-sm">
-                                    <thead><tr><th>Vertrag</th><th>Mitarbeiter</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+                                    <thead><tr><th>Vertrag</th><th>Mitarbeiter</th><th>Lohnanteil</th><th>Von</th><th>Bis</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach (var cp in p.ContractPayments.OrderByDescending(x => x.SharePercent))
                                         {
@@ -126,7 +124,17 @@ else
                                                 {
                                                     <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
                                                     <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
-                                                    <td><input type="number" class="form-control" @bind="editContractAssignCopies[cp.Id].SharePercent" /></td>
+                                                    <td>
+                                                        <div class="input-group">
+                                                            <input type="number"
+                                                                   class="form-control"
+                                                                   step="1"
+                                                                   min="0" 
+                                                                   max="100"
+                                                                   @bind="editContractAssignCopies[cp.Id].SharePercent" />
+                                                            <span class="input-group-text">%</span>
+                                                        </div>
+                                                    </td>
                                                     <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
                                                     <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
                                                     <td>
@@ -138,7 +146,7 @@ else
                                                 {
                                                     <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
                                                     <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
-                                                    <td>@cp.SharePercent</td>
+                                                    <td>@cp.SharePercent%</td>
                                                     <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.End?.ToShortDateString() ?? "-")</td>
                                                     <td>
@@ -159,7 +167,15 @@ else
                                                 </select>
                                             </td>
                                             <td>
-                                                <input type="number" class="form-control" min="0" max="100" @bind="contractInputs[p.Id].SharePercent" />
+                                                <div class="input-group">
+                                                    <input type="number"
+                                                           class="form-control"
+                                                           step="1"
+                                                           min="0"
+                                                           max="100"
+                                                           @bind="contractInputs[p.Id].SharePercent" />
+                                                    <span class="input-group-text">%</span>
+                                                </div>
                                             </td>
                                             <td>
                                                 <input type="date" class="form-control" @bind="contractInputs[p.Id].Start" />
@@ -174,27 +190,6 @@ else
                                         </tr>
                                     </tbody>
                                 </table>
-                                @* } *@
-
-                                @* <div class="border-top pt-2 mt-2">
-                                    <div class="row g-2 align-items-end">
-                                        <div class="col-auto">
-                                            <label class="form-label">Vertrag</label>
-                                            
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Anteil %</label>
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Von</label>
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Bis</label>
-                                        </div>
-                                        <div class="col-auto">
-                                        </div>
-                                    </div>
-                                </div> *@
                             </div>
                         </td>
                     </tr>
@@ -312,7 +307,7 @@ else
         }
         if (input.SharePercent < 0 || input.SharePercent > 100)
         {
-            message = "Anteil muss zwischen 0 und 100 liegen.";
+            message = "Lohnanteil muss zwischen 0 und 100 liegen.";
             return;
         }
 

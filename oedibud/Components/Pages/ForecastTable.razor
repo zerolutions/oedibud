@@ -148,8 +148,9 @@
                     for (var month = startMonth; month <= endMonth && remaining > 0; month = month.AddMonths(1))
                     {
                         var mStart = new DateTime(month.Year, month.Month, 1);
-                        var alreadyAssigned = assignedByMonth.TryGetValue(mStart, out var a) ? a : 0m;
-                        var need = (MonthlyCostForMonth(mStart)*cp.SharePercent/100m) - alreadyAssigned;
+                        // var alreadyAssigned = assignedByMonth.TryGetValue(mStart, out var a) ? a : 0m;
+                        // var need = (MonthlyCostForMonth(mStart) * cp.SharePercent / 100m) - alreadyAssigned;
+                        var need = (MonthlyCostForMonth(mStart)*cp.SharePercent/100m);
                         if (need <= 0) continue;
 
                         var take = Math.Min(need, remaining);
@@ -163,7 +164,7 @@
                         }
 
                         // always update assignedByMonth so earlier months consume amounts
-                        assignedByMonth[mStart] = alreadyAssigned + take;
+                        assignedByMonth[mStart] = take; //alreadyAssigned +
 
                         remaining -= take;
                     }
@@ -224,7 +225,7 @@
                     Type = RowItem.RowType.Contract,
                     EmployeeId = emp.Id,
                     ContractId = c.Id,
-                    Label = $"{c.Fte:0%} {emp.Group} | {c.Start:MMM yy} - {c.End:MMM yy}",
+                    Label = $"{c.FtePercent}% {emp.Group} | {c.Start:MMM yy} - {c.End:MMM yy}",
                     Title = $"Vertrags-ID {c.Id}",
                     Values = contractMonthValues[c.Id]
                 };

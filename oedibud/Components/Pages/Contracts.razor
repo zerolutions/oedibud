@@ -27,8 +27,18 @@
     <label>Ende</label>
     <InputDate class="form-control mb-2" @bind-Value="newContract.End" />
 
-    <label>FTE</label>
-    <input type="number" step="0.1" class="form-control mb-2" @bind="newContract.Fte" />
+    <label>Stellenanteil</label>
+    
+    <div class="input-group">
+        <input type="number"
+               class="form-control"
+               step="1"
+               min="0" max="100"
+               @bind="newContract.FtePercent" />
+        <span class="input-group-text">%</span>
+    </div>
+    @* <input type="number" step="1" min="0" max="100" class="form-control mb-2" @bind="newContract.FtePercent" /> *@
+
 
     <button class="btn btn-primary mt-2" @onclick="AddContract">Vertrag hinzufügen</button>
 </div>
@@ -53,7 +63,7 @@ else
                 <th>Mitarbeiter</th>
                 <th>Start</th>
                 <th>Ende</th>
-                <th>FTE</th>
+                <th>Stellenanteil</th>
                 <th></th>
             </tr>
         </thead>
@@ -67,7 +77,16 @@ else
                         <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
                         <td><input type="date" class="form-control" @bind="editContractCopy.Start" /></td>
                         <td><input type="date" class="form-control" @bind="editContractCopy.End" /></td>
-                        <td><input type="number" step="0.1" class="form-control" @bind="editContractCopy.Fte" /></td>
+                        <td>
+                            <div class="input-group">
+                                <input type="number"
+                                       class="form-control"
+                                       step="1"
+                                       min="0" max="100"
+                                       @bind="editContractCopy.FtePercent" />
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </td>
                         <td>
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveContract(editContractCopy.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditContract()">Abbrechen</button>
@@ -79,7 +98,7 @@ else
                         <td>@(c.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name ?? "-")</td>
                         <td>@c.Start.ToShortDateString()</td>
                         <td>@c.End.ToShortDateString()</td>
-                        <td>@c.Fte</td>
+                        <td>@c.FtePercent%</td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditContractRow(c)">Bearbeiten</button>
                             <button class="btn btn-danger btn-sm me-2" @onclick="() => DeleteContract(c.Id)">Löschen</button>
@@ -93,26 +112,20 @@ else
                     <tr>
                         <td colspan="7" class="p-0 bg-dark-subtle">
                             <div class="p-3">
-                                @* <h6>Zugeordnete Projektmittel</h6> *@
                                 @if (c.ContractPayments == null || c.ContractPayments.Count == 0)
                                 {
                                     <div><em>Keine Projektmittel zugewiesen</em></div>
                                 }
-                                @* else
-                                { *@
-                                    <table class="table-sm">
-                                        <thead>
-                                            <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var cp in c.ContractPayments.OrderByDescending(x => x.Payment?.Start))
-                                            {
-                                                <tr>
-                                                    @if (editingContractPaymentIds.Contains(cp.Id))
-                                                    {
-                                                        @* <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
-                                                        <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
-                                                        <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td> *@
+                                <table class="table-sm">
+                                    <thead>
+                                        <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var cp in c.ContractPayments.OrderByDescending(x => x.Payment?.Start))
+                                        {
+                                            <tr>
+                                                @if (editingContractPaymentIds.Contains(cp.Id))
+                                                {
                                                     <td colspan="5">
                                                         <select class="form-control" @bind="editContractPaymentCopies[cp.Id].PaymentId">
                                                             @* <option value="0">-- auswählen --</option> *@
@@ -123,89 +136,58 @@ else
                                                             }
                                                         </select>
                                                     </td>
-                                                        <td><input type="number" class="form-control" @bind="editContractPaymentCopies[cp.Id].SharePercent" /></td>
-                                                        <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
-                                                        <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractPayment(cp.Id)">Speichern</button>
-                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractPayment(cp.Id)">Abbrechen</button>
-                                                        </td>
-                                                    }
-                                                    else
-                                                    {
-                                                        <td>@payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"</td>
-                                                        <td>@($"PM-{cp.Payment?.Id}")</td>
-                                                        <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") - @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
-                                                        <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
-                                                        <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
-                                                        <td>@cp.SharePercent</td>
-                                                        <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
-                                                        <td>@(cp.End?.ToShortDateString() ?? "-")</td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractPayment(cp)">Bearbeiten</button>
-                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, c.Id)">Entfernen</button>
-                                                        </td>
-                                                    }
-                                                </tr>
-                                            }
-                                            <tr>
-                                                <td colspan="5">
-                                                    <select class="form-control" @bind="paymentInputs[c.Id].PaymentId">
-                                                        <option value="0">-- auswählen --</option>
-                                                        @foreach (var p in AvailablePaymentsForContract(c))
-                                                        {
-                                                            <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {p.DetecatedTo}")</option>
-                                                        }
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <input type="number" class="form-control" min="0" max="100" @bind="paymentInputs[c.Id].SharePercent" />
-                                                </td>
-                                                <td>
-                                                    <input type="date" class="form-control" @bind="paymentInputs[c.Id].Start" />
-                                                </td>
-                                                <td>
-                                                    <input type="date" class="form-control" @bind="paymentInputs[c.Id].End" />
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-success" @onclick="() => AddContractPayment(c)">Hinzufügen</button>
-                                                </td>
-                                                
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                @* } *@
-
-                                @* <div class="border-top pt-2 mt-2">
-                                    <h6>Projektmittel hinzufügen</h6>
-                                    <div class="row g-2 align-items-end">
-                                        <div class="col-auto">
-                                            <label class="form-label">Projektmittel</label>
-                                            <select class="form-control" @bind="paymentInputs[c.Id].PaymentId">
-                                                <option value="0">-- auswählen --</option>
-                                                @foreach (var p in AvailablePaymentsForContract(c))
-                                                {
-                                                    <option value="@p.Id">@($"{p.Date.ToShortDateString()} - {p.Amount.ToString("C")}")</option>
+                                                    <td><input type="number" class="form-control" min="0" max="100" @bind="editContractPaymentCopies[cp.Id].SharePercent" /></td>
+                                                    <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
+                                                    <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractPayment(cp.Id)">Speichern</button>
+                                                        <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractPayment(cp.Id)">Abbrechen</button>
+                                                    </td>
                                                 }
-                                            </select>
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Anteil %</label>
-                                            <input type="number" class="form-control" min="0" max="100" @bind="paymentInputs[c.Id].SharePercent" />
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Von</label>
-                                            <input type="date" class="form-control" @bind="paymentInputs[c.Id].Start" />
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Bis</label>
-                                            <input type="date" class="form-control" @bind="paymentInputs[c.Id].End" />
-                                        </div>
-                                        <div class="col-auto">
-                                            <button class="btn btn-success" @onclick="() => AddContractPayment(c)">Hinzufügen</button>
-                                        </div>
-                                    </div>
-                                </div> *@
+                                                else
+                                                {
+                                                    <td>@payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"</td>
+                                                    <td>@($"PM-{cp.Payment?.Id}")</td>
+                                                    <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") - @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
+                                                    <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
+                                                    <td>@cp.SharePercent</td>
+                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractPayment(cp)">Bearbeiten</button>
+                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, c.Id)">Entfernen</button>
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                        <tr>
+                                            <td colspan="5">
+                                                <select class="form-control" @bind="paymentInputs[c.Id].PaymentId">
+                                                    <option value="0">-- auswählen --</option>
+                                                    @foreach (var p in AvailablePaymentsForContract(c))
+                                                    {
+                                                        <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {p.DetecatedTo}")</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-control" min="0" max="100" @bind="paymentInputs[c.Id].SharePercent" />
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="paymentInputs[c.Id].Start" />
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control" @bind="paymentInputs[c.Id].End" />
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-success" @onclick="() => AddContractPayment(c)">Hinzufügen</button>
+                                            </td>
+                                                
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
                             </div>
                         </td>
                     </tr>
@@ -216,7 +198,12 @@ else
 }
 
 @code {
-    private Contract newContract = new Contract { Start = DateTime.Today, End = DateTime.Today.AddMonths(1), Fte = 1.0f };
+    private Contract newContract = new Contract
+    {
+        Start = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+        End = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1),
+        Fte = 1.0f
+    };
     private List<Employee> employees = new();
     private List<Contract> contracts = new();
     private List<Payment> payments = new();
