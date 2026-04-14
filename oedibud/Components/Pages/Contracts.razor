@@ -102,7 +102,7 @@ else
                                 { *@
                                     <table class="table-sm">
                                         <thead>
-                                            <tr><th>Datum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
+                                            <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
                                         </thead>
                                         <tbody>
                                             @foreach (var cp in c.ContractPayments.OrderByDescending(x => x.Payment?.Start))
@@ -113,13 +113,13 @@ else
                                                         @* <td>@(cp.Payment?.Date.ToShortDateString() ?? "-")</td>
                                                         <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
                                                         <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td> *@
-                                                    <td colspan="3">
+                                                    <td colspan="5">
                                                         <select class="form-control" @bind="editContractPaymentCopies[cp.Id].PaymentId">
                                                             @* <option value="0">-- auswählen --</option> *@
-                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@($"{cp?.Payment?.Start.ToShortDateString()} - {cp?.Payment?.End.ToShortDateString()} ({cp?.Payment?.Amount.ToString("C")})")</option>
+                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@($"{payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{cp.Payment?.Id} | {cp.Payment?.Start.ToShortDateString()} - {cp.Payment?.End.ToShortDateString()} | {cp.Payment?.Amount.ToString("C")} | {cp.Payment?.DetecatedTo}")</option>
                                                             @foreach (var p in AvailablePaymentsForContract(c))
                                                             {
-                                                                <option value="@p.Id">@($"{p.Start.ToShortDateString()} - {p.End.ToShortDateString()} ({p.Amount.ToString("C")})")</option>
+                                                                <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {p.DetecatedTo}")</option>
                                                             }
                                                         </select>
                                                     </td>
@@ -133,6 +133,8 @@ else
                                                     }
                                                     else
                                                     {
+                                                        <td>@payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"</td>
+                                                        <td>@($"PM-{cp.Payment?.Id}")</td>
                                                         <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") - @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
                                                         <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
                                                         <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
@@ -147,12 +149,12 @@ else
                                                 </tr>
                                             }
                                             <tr>
-                                                <td colspan="3">
+                                                <td colspan="5">
                                                     <select class="form-control" @bind="paymentInputs[c.Id].PaymentId">
                                                         <option value="0">-- auswählen --</option>
                                                         @foreach (var p in AvailablePaymentsForContract(c))
                                                         {
-                                                            <option value="@p.Id">@($"{p.Start.ToShortDateString()} - {p.End.ToShortDateString()} ({p.Amount.ToString("C")})")</option>
+                                                            <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {p.DetecatedTo}")</option>
                                                         }
                                                     </select>
                                                 </td>
