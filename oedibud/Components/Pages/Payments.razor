@@ -115,21 +115,33 @@ else
                                     <div><em>Keine Arbeitsverträge zugewiesen</em></div>
                                 }
                                 <table class="table-sm">
-                                    <thead><tr><th>Vertrag</th><th>Mitarbeiter</th><th>Lohnanteil</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+                                    <thead><tr><th>Mitarbeiter</th><th>AV-ID</th><th>Lohnanteil</th><th>Von</th><th>Bis</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach (var cp in p.ContractPayments.OrderByDescending(x => x.SharePercent))
                                         {
                                             <tr>
                                                 @if (editingContractAssignIds.Contains(cp.Id))
                                                 {
-                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
-                                                    <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    @* <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td> *@
+                                                    
+                                                    <td colspan="2">
+                                                        <select class="form-control" @bind="editContractAssignCopies[cp.Id].ContractId">
+                                                            <option value="0">-- auswählen --</option>
+                                                            @* <option value="@editContractAssignCopies[cp.Id].PaymentId">@($"{payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{cp.Payment?.Id} | {cp.Payment?.Start.ToShortDateString()} - {cp.Payment?.End.ToShortDateString()} | {cp.Payment?.Amount.ToString("C")} | {(cp.Payment?.DetecatedTo?.ToString() ?? "-")}")</option> *@
+                                                            <option value="@editContractAssignCopies[cp.Id].ContractId">@($"{cp.Contract?.Employee?.Name ?? "-"} | AV-{cp.ContractId} ({cp.Contract?.Start.ToShortDateString()} - {cp.Contract?.End.ToShortDateString()})")</option>
+                                                            @foreach (var c in AvailableContractsForPayment(p))
+                                                            {
+                                                                <option value="@c.Id">@($"{c.Employee?.Name ?? "-"} | AV-{c.Id} ({c.Start.ToShortDateString()} - {c.End.ToShortDateString()})")</option>
+                                                            }
+                                                        </select>
+                                                    </td>
                                                     <td>
                                                         <div class="input-group">
                                                             <input type="number"
                                                                    class="form-control"
                                                                    step="1"
-                                                                   min="0" 
+                                                                   min="0"
                                                                    max="100"
                                                                    @bind="editContractAssignCopies[cp.Id].SharePercent" />
                                                             <span class="input-group-text">%</span>
@@ -144,8 +156,8 @@ else
                                                 }
                                                 else
                                                 {
-                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
                                                     <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
                                                     <td>@cp.SharePercent%</td>
                                                     <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.End?.ToShortDateString() ?? "-")</td>
@@ -162,7 +174,7 @@ else
                                                     <option value="0">-- auswählen --</option>
                                                     @foreach (var c in AvailableContractsForPayment(p))
                                                     {
-                                                        <option value="@c.Id">@($"{c.Id} - {c.Employee?.Name ?? "-"} ({c.Start.ToShortDateString()} - {c.End.ToShortDateString()})")</option>
+                                                        <option value="@c.Id">@($"{c.Employee?.Name ?? "-"} | AV-{c.Id} ({c.Start.ToShortDateString()} - {c.End.ToShortDateString()})")</option>
                                                     }
                                                 </select>
                                             </td>
@@ -184,7 +196,7 @@ else
                                                 <input type="date" class="form-control" @bind="contractInputs[p.Id].End" />
                                             </td>
                                             <td>
-                                                <button class="btn btn-success" @onclick="() => AddContractAssignment(p)">Zuweisen</button>
+                                                <button class="btn btn-sm btn-success" @onclick="() => AddContractAssignment(p)">Zuweisen</button>
                                             </td>
 
                                         </tr>
@@ -526,6 +538,7 @@ else
                 dbItem.SharePercent = copy.SharePercent;
                 dbItem.Start = copy.Start;
                 dbItem.End = copy.End;
+                dbItem.ContractId = copy.ContractId;
                 await db.SaveChangesAsync();
 
                 var parent = payments.FirstOrDefault(p => p.ContractPayments.Any(x => x.Id == id));
@@ -537,6 +550,17 @@ else
                         parent.ContractPayments[idx].SharePercent = dbItem.SharePercent;
                         parent.ContractPayments[idx].Start = dbItem.Start;
                         parent.ContractPayments[idx].End = dbItem.End;
+                        parent.ContractPayments[idx].ContractId = dbItem.ContractId;
+
+                        var loadedCp = await db.ContractPayments
+                            .Include(x => x.Contract)
+                                .ThenInclude(c => c.Employee)
+                            .FirstOrDefaultAsync(x => x.Id == id);
+
+                        if (loadedCp != null)
+                        {
+                            parent.ContractPayments[idx].Contract = loadedCp.Contract;
+                        }
                     }
                 }
                 message = "Zuweisung gespeichert.";

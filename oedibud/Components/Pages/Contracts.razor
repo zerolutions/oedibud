@@ -118,7 +118,7 @@ else
                                 }
                                 <table class="table-sm">
                                     <thead>
-                                        <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Anteil %</th><th>Von</th><th>Bis</th><th></th></tr>
+                                        <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Lohnanteil</th><th>Von</th><th>Bis</th><th></th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var cp in c.ContractPayments.OrderByDescending(x => x.Payment?.Start))
@@ -128,15 +128,24 @@ else
                                                 {
                                                     <td colspan="5">
                                                         <select class="form-control" @bind="editContractPaymentCopies[cp.Id].PaymentId">
-                                                            @* <option value="0">-- auswählen --</option> *@
-                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@($"{payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{cp.Payment?.Id} | {cp.Payment?.Start.ToShortDateString()} - {cp.Payment?.End.ToShortDateString()} | {cp.Payment?.Amount.ToString("C")} | {cp.Payment?.DetecatedTo}")</option>
+                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@($"{payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{cp.Payment?.Id} | {cp.Payment?.Start.ToShortDateString()} - {cp.Payment?.End.ToShortDateString()} | {cp.Payment?.Amount.ToString("C")} | {(cp.Payment?.DetecatedTo?.ToString() ?? "-")}")</option>
                                                             @foreach (var p in AvailablePaymentsForContract(c))
                                                             {
-                                                                <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {p.DetecatedTo}")</option>
+                                                                <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {(p.DetecatedTo?.ToString() ?? "-")}")</option>
                                                             }
                                                         </select>
                                                     </td>
-                                                    <td><input type="number" class="form-control" min="0" max="100" @bind="editContractPaymentCopies[cp.Id].SharePercent" /></td>
+                                                    <td>
+                                                        <div class="input-group">
+                                                            <input type="number"
+                                                                   class="form-control"
+                                                                   step="1"
+                                                                   min="0"
+                                                                   max="100"
+                                                                   @bind="editContractPaymentCopies[cp.Id].SharePercent" />
+                                                            <span class="input-group-text">%</span>
+                                                        </div>
+                                                    </td>
                                                     <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
                                                     <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
                                                     <td>
@@ -146,12 +155,12 @@ else
                                                 }
                                                 else
                                                 {
-                                                    <td>@payments.FirstOrDefault(p => p.Id == cp.PaymentId)?.Project?.Title ?? "Unbekanntes Projekt"</td>
+                                                    <td>@(projects.FirstOrDefault(pr => pr.Id == cp.Payment.ProjectId)?.Title ?? "Unbekanntes Projekt")</td>
                                                     <td>@($"PM-{cp.Payment?.Id}")</td>
                                                     <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") - @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
                                                     <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
-                                                    <td>@cp.SharePercent</td>
+                                                    <td>@cp.SharePercent%</td>
                                                     <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.End?.ToShortDateString() ?? "-")</td>
                                                     <td>
@@ -167,12 +176,21 @@ else
                                                     <option value="0">-- auswählen --</option>
                                                     @foreach (var p in AvailablePaymentsForContract(c))
                                                     {
-                                                        <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {p.DetecatedTo}")</option>
+                                                        <option value="@p.Id">@($"{payments.FirstOrDefault(pa => pa.Id == p.Id)?.Project?.Title ?? "Unbekanntes Projekt"} | PM-{p.Id} | {p.Start.ToShortDateString()} - {p.End.ToShortDateString()} | {p.Amount.ToString("C")} | {(p.DetecatedTo?.ToString() ?? "-")}")</option>
                                                     }
                                                 </select>
                                             </td>
+                                            
                                             <td>
-                                                <input type="number" class="form-control" min="0" max="100" @bind="paymentInputs[c.Id].SharePercent" />
+                                                <div class="input-group">
+                                                    <input type="number"
+                                                           class="form-control"
+                                                           step="1"
+                                                           min="0"
+                                                           max="100"
+                                                           @bind="paymentInputs[c.Id].SharePercent" />
+                                                    <span class="input-group-text">%</span>
+                                                </div>
                                             </td>
                                             <td>
                                                 <input type="date" class="form-control" @bind="paymentInputs[c.Id].Start" />
@@ -205,6 +223,7 @@ else
         Fte = 1.0f
     };
     private List<Employee> employees = new();
+    private List<Project> projects = new();
     private List<Contract> contracts = new();
     private List<Payment> payments = new();
     private string message = string.Empty;
@@ -231,6 +250,7 @@ else
     {
         using var db = DbFactory.CreateDbContext();
         employees = await db.Employees.OrderBy(e => e.Name).ToListAsync();
+        projects = await db.Projects.OrderByDescending(p => p.Start).ToListAsync();
         payments = await db.Payments.OrderByDescending(p => p.Start).ToListAsync();
         contracts = await db.Contracts
             .Include(c => c.Employee)
