@@ -24,21 +24,31 @@
     }
 
     private List<DateTime> Columns = new();
-
     private class RowItem
     {
-        public enum RowType { Employee, Contract, ContractPayment }
+        public enum RowType { Employee, Contract, ContractPayment, Project, Payment };
         public RowType Type { get; set; }
-        public int EmployeeId { get; set; }
         public int? ContractId { get; set; }
         public string Label { get; set; } = "";
         public string Title { get; set; } = "";
         public decimal[] Values { get; set; } = Array.Empty<decimal>();
     }
+    private class RowItemEmp : RowItem
+    {
+        public int EmployeeId { get; set; }
+    }
+    private class RowItemPro : RowItem
+    {
+        public int ProjectId { get; set; }
+        public int? PaymentId { get; set; }
+    }
 
-    private List<RowItem> Rows = new();
+    private List<RowItemEmp> Rows = new();
+    private List<RowItemPro> ProjectRows = new();
     private HashSet<int> Expanded = new();
+    private HashSet<int> ExpandedProjects = new();
     private decimal[] Totals = Array.Empty<decimal>();
+    private decimal[] ProjectTotals = Array.Empty<decimal>();
     private Dictionary<int, Dictionary<int, decimal[]>>? perContractPaymentAlloc = null;
 
     private Action? _onChangeHandler;
@@ -73,9 +83,9 @@
         foreach (var emp in employees.OrderBy(e => e.Name))
         {
             Expanded.Add(emp.Id);
-            var empRow = new RowItem
+            var empRow = new RowItemEmp
             {
-                Type = RowItem.RowType.Employee,
+                Type = RowItemEmp.RowType.Employee,
                 EmployeeId = emp.Id,
                 Label = emp.Name ,
                 Values = new decimal[Months]
@@ -220,9 +230,9 @@
             // add contract rows and their payment rows as children (initially collapsed)
             foreach (var c in empContracts)
             {
-                var crow = new RowItem
+                var crow = new RowItemEmp
                 {
-                    Type = RowItem.RowType.Contract,
+                    Type = RowItemEmp.RowType.Contract,
                     EmployeeId = emp.Id,
                     ContractId = c.Id,
                     Label = $"{c.FtePercent}% {emp.Group} | {c.Start:MMM yy} - {c.End:MMM yy}",
@@ -242,9 +252,9 @@
                     if (perContractPaymentAlloc != null && perContractPaymentAlloc.TryGetValue(c.Id, out var dict) && dict.TryGetValue(cp.Id, out var cpAlloc))
                         allocValues = cpAlloc;
 
-                    Rows.Add(new RowItem
+                    Rows.Add(new RowItemEmp
                     {
-                        Type = RowItem.RowType.ContractPayment,
+                        Type = RowItemEmp.RowType.ContractPayment,
                         EmployeeId = emp.Id,
                         ContractId = c.Id,
                         Label = $" {cp.SharePercent}% {p.DetecatedTo} | {((p.Project?.Title) ?? "")} PM-{p.Id}",
@@ -257,10 +267,163 @@
 
         // compute grand totals (sum of employee rows)
         Totals = new decimal[Months];
-        foreach (var er in Rows.Where(r => r.Type == RowItem.RowType.Employee))
+        foreach (var er in Rows.Where(r => r.Type == RowItemEmp.RowType.Employee))
         {
             for (int m = 0; m < Months; m++)
                 Totals[m] += er.Values[m];
+        }
+
+        // build project hierarchy rows (Project -> Payment -> ContractPayment)
+        ProjectRows.Clear();
+        var projects = await db.Projects
+            .Include(pr => pr.Payments)
+                .ThenInclude(p => p.ContractPayments)
+                    .ThenInclude(cp => cp.Contract)
+                        .ThenInclude(c => c.Employee)
+            .ToListAsync();
+
+        foreach (var project in projects.OrderBy(pr => pr.Title))
+        {
+            ExpandedProjects.Add(project.Id);
+
+            var paymentResults = new Dictionary<int, decimal[]>();
+            var paymentAllocations = new Dictionary<int, Dictionary<int, decimal[]>>();
+
+            foreach (var payment in project.Payments.Where(p => p.End >= Columns.First() && p.Start <= Columns.Last()))
+            {
+                var paymentMonthStart = new DateTime(payment.Start.Year, payment.Start.Month, 1);
+                var paymentMonthEnd = new DateTime(payment.End.Year, payment.End.Month, 1);
+                var paymentPeriodMonths = new List<DateTime>();
+                for (var month = paymentMonthStart; month <= paymentMonthEnd; month = month.AddMonths(1))
+                    paymentPeriodMonths.Add(month);
+
+                var assignedByMonth = paymentPeriodMonths.ToDictionary(m => m, _ => 0m);
+                var perPaymentAlloc = new Dictionary<int, decimal[]>();
+
+                foreach (var cp in payment.ContractPayments)
+                {
+                    var contract = cp.Contract;
+                    if (contract == null || contract.Employee == null)
+                    {
+                        perPaymentAlloc[cp.Id] = new decimal[Months];
+                        continue;
+                    }
+
+                    decimal MonthlyCostForMonth(DateTime month)
+                    {
+                        var monthStart = new DateTime(month.Year, month.Month, 1);
+                        if (monthStart < new DateTime(contract.Start.Year, contract.Start.Month, 1) || monthStart > new DateTime(contract.End.Year, contract.End.Month, 1))
+                            return 0m;
+                        int level = contract.Employee.GetLevelAt(monthStart);
+                        var salary = TvL.GetSalary(contract.Employee.Group, level);
+                        return salary * (decimal)contract.Fte;
+                    }
+
+                    var cpAlloc = new decimal[Months];
+                    var cpStart = cp.Start.HasValue ? new DateTime(cp.Start.Value.Year, cp.Start.Value.Month, 1) : paymentMonthStart;
+                    var cpEnd = cp.End.HasValue ? new DateTime(cp.End.Value.Year, cp.End.Value.Month, 1) : paymentMonthEnd;
+
+                    for (var month = cpStart; month <= cpEnd; month = month.AddMonths(1))
+                    {
+                        if (month < paymentMonthStart || month > paymentMonthEnd)
+                            continue;
+
+                        var need = MonthlyCostForMonth(month) * cp.SharePercent / 100m;
+                        assignedByMonth[month] += need;
+
+                        var visIndex = Columns.FindIndex(d => d.Year == month.Year && d.Month == month.Month);
+                        if (visIndex >= 0)
+                        {
+                            cpAlloc[visIndex] = need;
+                        }
+                    }
+
+                    perPaymentAlloc[cp.Id] = cpAlloc;
+                }
+
+                paymentAllocations[payment.Id] = perPaymentAlloc;
+
+                var paymentValues = new decimal[Months];
+                var cumulativeAssigned = 0m;
+                foreach (var month in paymentPeriodMonths)
+                {
+                    cumulativeAssigned += assignedByMonth[month];
+                    var visIndex = Columns.FindIndex(d => d.Year == month.Year && d.Month == month.Month);
+                    if (visIndex >= 0)
+                    {
+                        paymentValues[visIndex] = payment.Amount - cumulativeAssigned;
+                    }
+                }
+
+                paymentResults[payment.Id] = paymentValues;
+            }
+
+            var projectMonthlyNet = new decimal[Months];
+            foreach (var paymentValues in paymentResults.Values)
+            {
+                for (int m = 0; m < Months; m++)
+                    projectMonthlyNet[m] += paymentValues[m];
+            }
+
+            var projectValues = new decimal[Months];
+            for (int m = 0; m < Months; m++)
+            {
+                projectValues[m] = projectMonthlyNet[m];
+            }
+
+            ProjectRows.Add(new RowItemPro
+            {
+                Type = RowItemPro.RowType.Project,
+                ProjectId = project.Id,
+                Label = project.Title,
+                Title = $"Projekt-ID {project.Id} | {project.Start:MMM yy} - {project.End:MMM yy} | Gesamt {project.TotalAmount:C0}",
+                Values = projectValues
+            });
+
+            foreach (var payment in project.Payments.OrderBy(p => p.Start))
+            {
+                if (payment.End < Columns.First() || payment.Start > Columns.Last())
+                    continue;
+
+                if (!paymentResults.TryGetValue(payment.Id, out var paymentValues))
+                    paymentValues = new decimal[Months];
+
+                ProjectRows.Add(new RowItemPro
+                {
+                    Type = RowItemPro.RowType.Payment,
+                    ProjectId = project.Id,
+                    PaymentId = payment.Id,
+                    Label = $"PM-{payment.Id} {payment.DetecatedTo} | {payment.Start:MMM yy} - {payment.End:MMM yy}",
+                    Title = $"Projektmittel-ID {payment.Id} | Betrag {payment.Amount:C0} | Gewidmet {payment.DetecatedTo}",
+                    Values = paymentValues
+                });
+
+                if (!paymentAllocations.TryGetValue(payment.Id, out var allocDict))
+                    allocDict = new Dictionary<int, decimal[]>();
+
+                foreach (var cp in payment.ContractPayments.OrderByDescending(x => x.SharePercent))
+                {
+                    var cpAlloc = allocDict.TryGetValue(cp.Id, out var cpValues) ? cpValues : new decimal[Months];
+                    var negAlloc = cpAlloc.Select(v => -v).ToArray();
+
+                    ProjectRows.Add(new RowItemPro
+                    {
+                        Type = RowItemPro.RowType.ContractPayment,
+                        ProjectId = project.Id,
+                        PaymentId = payment.Id,
+                        Label = $" {cp.SharePercent}% {cp.Contract?.Employee?.Name ?? "-"} | AV-{cp.ContractId}",
+                        Title = $"Vertrag-ID {cp.ContractId} | Zuweisung {cp.Start:MMM yy} - {cp.End:MMM yy} | Projektmittel-ID {payment.Id}",
+                        Values = negAlloc
+                    });
+                }
+            }
+        }
+
+        ProjectTotals = new decimal[Months];
+        foreach (var pr in ProjectRows.Where(r => r.Type == RowItemPro.RowType.Project))
+        {
+            for (int m = 0; m < Months; m++)
+                ProjectTotals[m] += pr.Values[m];
         }
     }
 
@@ -268,6 +431,12 @@
     {
         if (Expanded.Contains(empId)) Expanded.Remove(empId);
         else Expanded.Add(empId);
+    }
+
+    private void ToggleProject(int projectId)
+    {
+        if (ExpandedProjects.Contains(projectId)) ExpandedProjects.Remove(projectId);
+        else ExpandedProjects.Add(projectId);
     }
 }
 
@@ -304,7 +473,7 @@
     <tbody>
         @foreach (var row in Rows)
         {
-            if (row.Type == RowItem.RowType.Employee)
+            if (row.Type == RowItemEmp.RowType.Employee)
             {
                 <tr class="table-primary fw-bold">
                     <td>
@@ -321,7 +490,7 @@
                     }
                 </tr>
             }
-            else if (row.Type == RowItem.RowType.Contract)
+            else if (row.Type == RowItemEmp.RowType.Contract)
             {
                 if (!Expanded.Contains(row.EmployeeId)) { continue; }
                 <tr class="table-secondary">
@@ -333,7 +502,7 @@
                     }
                 </tr>
             }
-            else if (row.Type == RowItem.RowType.ContractPayment)
+            else if (row.Type == RowItemEmp.RowType.ContractPayment)
             {
                 if (!Expanded.Contains(row.EmployeeId)) { continue; }
                 <tr class="table-success">
@@ -354,6 +523,76 @@
             @for (int i = 0; i < Totals.Length; i++)
             {
                 <td>@Totals[i].ToString("C0")</td>
+            }
+        </tr>
+    </tfoot>
+</table>
+
+<h4 class="mt-5">Projektübersicht</h4>
+<table class="table table-borderless mt-3 text-end">
+    <thead>
+        <tr>
+            <th />
+            <th></th>
+            @foreach (var col in Columns)
+            {
+                <th>@col.ToString("MMM yy")</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var row in ProjectRows)
+        {
+            if (row.Type == RowItemPro.RowType.Project)
+            {
+                <tr class="table-primary fw-bold">
+                    <td>
+                        <button class="btn btn pb-0 pt-0" @onclick="() => ToggleProject(row.ProjectId)">
+                            @(ExpandedProjects.Contains(row.ProjectId) ? "-" : "+")
+                        </button>
+                    </td>
+                    <td title="@row.Title">
+                        @row.Label
+                    </td>
+                    @for (int i = 0; i < row.Values.Length; i++)
+                    {
+                        <td>@row.Values[i].ToString("C0")</td>
+                    }
+                </tr>
+            }
+            else if (row.Type == RowItemPro.RowType.Payment)
+            {
+                if (!ExpandedProjects.Contains(row.ProjectId)) { continue; }
+                <tr class="table-secondary">
+                    <td class="table-primary" />
+                    <td title="@row.Title" style="padding-left:10px">@row.Label</td>
+                    @for (int i = 0; i < row.Values.Length; i++)
+                    {
+                        <td>@row.Values[i].ToString("C0")</td>
+                    }
+                </tr>
+            }
+            else if (row.Type == RowItemPro.RowType.ContractPayment)
+            {
+                if (!ExpandedProjects.Contains(row.ProjectId)) { continue; }
+                <tr class="table-success">
+                    <td class="table-primary" />
+                    <td title="@row.Title" style="padding-left:20px">@row.Label</td>
+                    @for (int i = 0; i < row.Values.Length; i++)
+                    {
+                        <td>@row.Values[i].ToString("C0")</td>
+                    }
+                </tr>
+            }
+        }
+    </tbody>
+    <tfoot>
+        <tr class="table-dark fw-bold">
+            <td />
+            <td>Gesamt</td>
+            @for (int i = 0; i < ProjectTotals.Length; i++)
+            {
+                <td>@ProjectTotals[i].ToString("C0")</td>
             }
         </tr>
     </tfoot>
