@@ -20,7 +20,7 @@ builder.Services.AddSingleton<DataChangeNotifier>();
 builder.Services.AddBlazorBootstrap();
 
 
-
+builder.Services.AddScoped<ForecastEngine>();
 
 var app = builder.Build();
 
