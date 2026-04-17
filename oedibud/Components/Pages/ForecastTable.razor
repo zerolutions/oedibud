@@ -345,24 +345,35 @@
 
                 var paymentValues = new decimal[Months];
                 var cumulativeAssigned = 0m;
-                foreach (var month in paymentPeriodMonths)
+                for (int idx = 0; idx < paymentPeriodMonths.Count; idx++)
                 {
-                    cumulativeAssigned += assignedByMonth[month];
+                    var month = paymentPeriodMonths[idx];
                     var visIndex = Columns.FindIndex(d => d.Year == month.Year && d.Month == month.Month);
                     if (visIndex >= 0)
                     {
                         paymentValues[visIndex] = payment.Amount - cumulativeAssigned;
                     }
+                    cumulativeAssigned += assignedByMonth[month];
                 }
 
                 paymentResults[payment.Id] = paymentValues;
             }
 
             var projectMonthlyNet = new decimal[Months];
+            // Sum all payment values (already contains delayed cost deduction)
             foreach (var paymentValues in paymentResults.Values)
             {
                 for (int m = 0; m < Months; m++)
                     projectMonthlyNet[m] += paymentValues[m];
+            }
+            // Subtract all contract costs of current month (negative cpAlloc values)
+            foreach (var allocDict in paymentAllocations.Values)
+            {
+                foreach (var cpValues in allocDict.Values)
+                {
+                    for (int m = 0; m < Months; m++)
+                        projectMonthlyNet[m] -= cpValues[m];
+                }
             }
 
             var projectValues = new decimal[Months];
