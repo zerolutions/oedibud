@@ -93,11 +93,83 @@
 }
 else
 {
+    <h4 class="mt-5 text-center">Projektübersicht (kummuliert)</h4>
+
+    @* -------------------------
+       Tabelle 2: Projekt-Sicht
+       ------------------------- *@
+    <table class="table table-sm table-borderless mt-3 text-end table-hover">
+        <thead>
+            <tr>
+                <th />
+                <th></th>
+                @foreach (var col in Result.Columns)
+                {
+                    <th>@col.ToString("MMM yy")</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Result.Nodes.Where(n => n.RootKind == ForecastEngine.RootKind.Project))
+            {
+                if (row.Level > 0 && !ExpandedProjects.Contains(row.RootId)) { continue; }
+
+                if (row.Level == 0)
+                {
+                    <tr class="table-danger fw-bold">
+                        <td>
+                            <button class="btn btn pb-0 pt-0" @onclick="() => ToggleProject(row.RootId)">
+                                @(ExpandedProjects.Contains(row.RootId) ? "-" : "+")
+                            </button>
+                        </td>
+                        <td title="@row.Title">@((MarkupString)row.Label)</td>
+                        @for (int i = 0; i < row.Values.Length; i++)
+                        {
+                            <td class="@(@row.Values[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(row.Values[i])</td>
+                        }
+                    </tr>
+                }
+                else if (row.Level == 1)
+                {
+                    <tr class="table-success">
+                        <td class="table-danger" />
+                        <td title="@row.Title" style="padding-left:10px">@((MarkupString)row.Label)</td>
+                        @for (int i = 0; i < row.Values.Length; i++)
+                        {
+                            <td class="@(@row.Values[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(row.Values[i])</td>
+                        }
+                    </tr>
+                }
+                else
+                {
+                    <tr class="table-secondary">
+                        <td class="table-danger" />
+                        <td title="@row.Title" style="padding-left:20px">@((MarkupString)row.Label)</td>
+                        @for (int i = 0; i < row.Values.Length; i++)
+                        {
+                            <td>@FormatCurrencyShort(row.Values[i])</td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+        <tfoot>
+            <tr class="table-dark fw-bold">
+                <td />
+                <td>Gesamt</td>
+                @for (int i = 0; i < Result.ProjectTotals.Length; i++)
+                {
+                    <td class="@(@Result.ProjectTotals[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(Result.ProjectTotals[i])</td>
+                }
+            </tr>
+        </tfoot>
+    </table>
+
     @* -------------------------
        Tabelle 1: Mitarbeiter-Sicht
        ------------------------- *@
-    <h4 class="mt-5 text-center">Personalübersicht</h4>
-    <table class="table table-borderless mt-3 text-end">
+    <h4 class="mt-5 text-center">Personalkosten (nicht kummuliert)</h4>
+    <table class="table table-sm table-borderless mt-3 text-end table-hover">
         <thead>
             <tr>
                 <th />
@@ -121,7 +193,7 @@ else
                                 @(ExpandedEmployees.Contains(row.RootId) ? "-" : "+")
                             </button>
                         </td>
-                        <td title="@row.Title">@row.Label</td>
+                        <td title="@row.Title">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < row.Values.Length; i++)
                         {
                             <td class="@(@row.Values[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(row.Values[i])</td>
@@ -132,7 +204,7 @@ else
                 {
                     <tr class="table-secondary">
                         <td class="table-primary" />
-                        <td title="@row.Title" style="padding-left:10px">@row.Label</td>
+                        <td title="@row.Title" style="padding-left:10px">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < row.Values.Length; i++)
                         {
                             <td>@FormatCurrencyShort(row.Values[i])</td>
@@ -143,7 +215,7 @@ else
                 {
                     <tr class="table-success">
                         <td class="table-primary" />
-                        <td title="@row.Title" style="padding-left:20px">@row.Label</td>
+                        <td title="@row.Title" style="padding-left:20px">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < row.Values.Length; i++)
                         {
                             <td>@FormatCurrencyShort(row.Values[i])</td>
@@ -164,79 +236,7 @@ else
         </tfoot>
     </table>
 
-    <h4 class="mt-5 text-center">Projektübersicht</h4>
-
-    @* -------------------------
-       Tabelle 2: Projekt-Sicht
-       ------------------------- *@
-    <table class="table table-borderless mt-3 text-end">
-        <thead>
-            <tr>
-                <th />
-                <th></th>
-                @foreach (var col in Result.Columns)
-                {
-                    <th>@col.ToString("MMM yy")</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var row in Result.Nodes.Where(n => n.RootKind == ForecastEngine.RootKind.Project))
-            {
-                if (row.Level > 0 && !ExpandedProjects.Contains(row.RootId)) { continue; }
-
-                if (row.Level == 0)
-                {
-                    <tr class="table-primary fw-bold">
-                        <td>
-                            <button class="btn btn pb-0 pt-0" @onclick="() => ToggleProject(row.RootId)">
-                                @(ExpandedProjects.Contains(row.RootId) ? "-" : "+")
-                            </button>
-                        </td>
-                        <td title="@row.Title">@row.Label</td>
-                        @for (int i = 0; i < row.Values.Length; i++)
-                        {
-                            <td class="@(@row.Values[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(row.Values[i])</td>
-                        }
-                    </tr>
-                }
-                else if (row.Level == 1)
-                {
-                    <tr class="table-secondary">
-                        <td class="table-primary" />
-                        <td title="@row.Title" style="padding-left:10px">@row.Label</td>
-                        @for (int i = 0; i < row.Values.Length; i++)
-                        {
-                            <td class="@(@row.Values[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(row.Values[i])</td>
-                        }
-                    </tr>
-                }
-                else
-                {
-                    <tr class="table-success">
-                        <td class="table-primary" />
-                        <td title="@row.Title" style="padding-left:20px">@row.Label</td>
-                        @for (int i = 0; i < row.Values.Length; i++)
-                        {
-                            <td>@FormatCurrencyShort(row.Values[i])</td>
-                        }
-                    </tr>
-                }
-            }
-        </tbody>
-        <tfoot>
-            <tr class="table-dark fw-bold">
-                <td />
-                <td>Gesamt</td>
-                @for (int i = 0; i < Result.ProjectTotals.Length; i++)
-                {
-                    <td class="@(@Result.ProjectTotals[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(Result.ProjectTotals[i])</td>
-                }
-            </tr>
-        </tfoot>
-    </table>
-
-    <table class="table table-borderless mt-5 w-25">
+    @* <table class="table table-borderless mt-5 w-25">
         <thead>
             <tr>
                 <th>Legende</th>
@@ -253,5 +253,5 @@ else
                 <td>Projekt | Anteil an Projektmittelsumme</td>
             </tr>
         </tbody>
-    </table>
+    </table> *@
 }

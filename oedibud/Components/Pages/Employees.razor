@@ -178,7 +178,7 @@ else
     {
         public DateTime Start { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         public DateTime End { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1);
-        public float FtePercent { get; set; } = 100f;
+        public decimal FtePercent { get; set; } = 100m;
     }
     private Dictionary<int, ContractInput> contractInputs = new();
     private string message = "";

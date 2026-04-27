@@ -114,14 +114,14 @@ else
                 if (expanded.Contains(p.Id))
                 {
                     <tr>
-                        <td colspan="7" class="p-0 bg-dark-subtle">
+                        <td colspan="8" class="p-0 bg-dark-subtle">
                             <div class="p-3">
                                 @if (p.ContractPayments == null || p.ContractPayments.Count == 0)
                                 {
                                     <div><em>Keine Arbeitsverträge zugewiesen</em></div>
                                 }
-                                <table class="table-sm">
-                                    <thead><tr><th>Mitarbeiter</th><th>AV-ID</th><th>Lohnanteil</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+                                <table class="table-sm table-hover">
+                                    <thead><tr><th>Mitarbeiter</th><th>AV-ID</th><th>Lohnanteil</th><th>Reallohnanteil</th><th>Von</th><th>Bis</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach (var cp in p.ContractPayments.OrderByDescending(x => x.SharePercent))
                                         {
@@ -153,6 +153,7 @@ else
                                                             <span class="input-group-text">%</span>
                                                         </div>
                                                     </td>
+                                                    <td>@(editContractAssignCopies[cp.Id].SharePercent * editContractAssignCopies[cp.Id].Contract?.Fte)%</td>
                                                     <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
                                                     <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
                                                     <td>
@@ -165,6 +166,7 @@ else
                                                     <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
                                                     <td>@(cp.Contract?.Id.ToString() ?? "-")</td>
                                                     <td>@cp.SharePercent%</td>
+                                                    <td>@(cp.SharePercent* cp.Contract?.Fte)%</td>
                                                     <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.End?.ToShortDateString() ?? "-")</td>
                                                     <td>
@@ -195,6 +197,7 @@ else
                                                     <span class="input-group-text">%</span>
                                                 </div>
                                             </td>
+                                            <td>%</td>
                                             <td>
                                                 <input type="date" class="form-control" @bind="contractInputs[p.Id].Start" />
                                             </td>
@@ -459,6 +462,21 @@ else
 
     private async Task SavePaymentEdit(int id)
     {
+        if (editPaymentCopy.ProjectId == 0)
+        {
+            message = "Bitte ein Projekt auswählen.";
+            return;
+        }
+        if (editPaymentCopy.Title == "")
+        {
+            message = "Bitte einen Titel vergeben.";
+            return;
+        }
+        if (editPaymentCopy.Amount == 0m)
+        {
+            message = "Betrag muss größer als 0 sein.";
+            return;
+        }
         try
         {
             using var db = DbFactory.CreateDbContext();

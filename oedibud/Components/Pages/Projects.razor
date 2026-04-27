@@ -78,16 +78,13 @@ else
                     <tr>
                         <td colspan="7" class="p-0 bg-dark-subtle">
                             <div class="p-3">
-                                @* <h6>Personalmittel</h6> *@
                                 @if (p.Payments.Count == 0)
                                 {
                                     <div><em>Keine Projektmittel zugewiesen</em></div>
                                 }
-                                @* else
-                                { *@
                                 <table class="table-sm">
                                     <thead>
-                                        <tr><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
+                                        <tr><th>Titel</th><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var pay in p.Payments.OrderByDescending(x => x.Start))
@@ -95,6 +92,9 @@ else
                                             <tr>
                                                 @if (editingPaymentIds.Contains(pay.Id))
                                                 {
+                                                    <td>
+                                                        <input type="text" class="form-control mb-1" @bind="editPaymentCopies[pay.Id].Title" />
+                                                    </td>
                                                     <td>
                                                         <input type="date" class="form-control mb-1" @bind="editPaymentCopies[pay.Id].Start" />
                                                     </td>
@@ -118,6 +118,7 @@ else
                                                 }
                                                 else
                                                 {
+                                                    <td>@pay.Title</td>
                                                     <td>@pay.Start.ToShortDateString()</td>
                                                     <td>@pay.End.ToShortDateString()</td>
                                                     <td>@pay.Amount.ToString("C")</td>
@@ -130,6 +131,9 @@ else
                                             </tr>
                                         }
                                         <tr>
+                                            <td>
+                                                <input type="text" class="form-control" @bind="paymentInputs[p.Id].Title" />
+                                            </td>
                                             <td>
                                                 <input type="date" class="form-control" @bind="paymentInputs[p.Id].Start" />
                                             </td>
@@ -156,37 +160,6 @@ else
 
                                     </tbody>
                                 </table>
-                                @* } *@
-
-                                @* <div class="border-top pt-2 mt-2">
-                                    <div class="row g-2 align-items-end">
-                                        <div class="col-auto">
-                                            <label class="form-label">Von</label>
-                                            <input type="date" class="form-control" @bind="paymentInputs[p.Id].Start" />
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Bis</label>
-                                            <input type="date" class="form-control" @bind="paymentInputs[p.Id].End" />
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label">Betrag</label>
-                                            <input type="number" step="1" class="form-control" @bind="paymentInputs[p.Id].Amount" />
-                                        </div>
-                                        <div class="col-auto">
-                                            <label class="form-label>">Gewidmet</label>
-                                            <select class="form-control" @bind="paymentInputs[p.Id].DetecatedTo">
-                                                <option value="">-- keine Angabe --</option>
-                                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                                                {
-                                                    <option value="@g">@g</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="col-auto">
-                                            <button class="btn btn-success" @onclick="() => AddPayment(p)">Hinzufügen</button>
-                                        </div>
-                                    </div>
-                                </div> *@
                             </div>
                         </td>
                     </tr>
@@ -211,6 +184,7 @@ else
     // simple per-project input model for new payment
     private class PaymentInput
     {
+        public string Title { get; set; } = "";
         public DateTime Start { get; set; }
         public DateTime End { get; set; }
         public decimal Amount { get; set; }
@@ -219,6 +193,7 @@ else
         public PaymentInput() { }
         public PaymentInput(DateTime start, decimal amount, EmployeeGroup? dedicatedTo, DateTime? end = null)
         {
+            Title = "";
             Start = start;
             End = end ?? start;
             Amount = amount;
@@ -293,14 +268,21 @@ else
         if (!paymentInputs.TryGetValue(project.Id, out var input))
             return;
 
+        if (input.Title == "")
+        {
+            message = "Bitte einen Titel vergeben.";
+            return;
+        }
         if (input.Amount == 0m)
         {
             message = "Betrag muss größer als 0 sein.";
             return;
         }
 
+
         var payment = new Payment
         {
+            Title = input.Title,
             ProjectId = project.Id,
             Start = input.Start,
             End = input.End,
@@ -439,6 +421,7 @@ else
         editPaymentCopies[p.Id] = new Payment
         {
             Id = p.Id,
+            Title = p.Title,
             Start = p.Start,
             End = p.End,
             Amount = p.Amount,
@@ -456,12 +439,23 @@ else
     private async Task SavePayment(int id)
     {
         if (!editPaymentCopies.TryGetValue(id, out var copy)) return;
+        if (copy.Title == "")
+        {
+            message = "Bitte einen Titel vergeben.";
+            return;
+        }
+        if (copy.Amount == 0m)
+        {
+            message = "Betrag muss größer als 0 sein.";
+            return;
+        }
         try
         {
             using var db = DbFactory.CreateDbContext();
             var dbItem = await db.Payments.FindAsync(id);
             if (dbItem != null)
             {
+                dbItem.Title = copy.Title;
                 dbItem.Start = copy.Start;
                 dbItem.End = copy.End;
                 dbItem.Amount = copy.Amount;
@@ -473,6 +467,7 @@ else
                     var idx = proj.Payments?.FindIndex(x => x.Id == id) ?? -1;
                     if (idx >= 0)
                     {
+                        proj.Payments[idx].Title = dbItem.Title;
                         proj.Payments[idx].Start = dbItem.Start;
                         proj.Payments[idx].End = dbItem.End;
                         proj.Payments[idx].Amount = dbItem.Amount;

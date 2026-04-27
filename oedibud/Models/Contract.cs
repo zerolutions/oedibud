@@ -13,9 +13,9 @@ public class Contract
 
     public DateTime Start { get; set; }
     public DateTime End { get; set; }
-    public float Fte { get; set; }
+    public decimal Fte { get; set; }
     [NotMapped]
-    public float FtePercent
+    public decimal FtePercent
     {
         get => Fte * 100;
         set => Fte = value / 100;

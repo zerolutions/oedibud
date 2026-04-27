@@ -118,7 +118,7 @@ else
                                 }
                                 <table class="table-sm">
                                     <thead>
-                                        <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Lohnanteil</th><th>Von</th><th>Bis</th><th></th></tr>
+                                        <tr><th>Projekt</th><th>PM-ID</th><th>Zeitraum</th><th>Betrag</th><th>Gewidmet</th><th>Lohnanteil</th><th>Reallohnanteil</th><th>Von</th><th>Bis</th><th></th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var cp in c.ContractPayments.OrderByDescending(x => x.Payment?.Start))
@@ -146,6 +146,7 @@ else
                                                             <span class="input-group-text">%</span>
                                                         </div>
                                                     </td>
+                                                    <td>@(editContractPaymentCopies[cp.Id].SharePercent * editContractPaymentCopies[cp.Id].Contract?.Fte)%</td>
                                                     <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
                                                     <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
                                                     <td>
@@ -155,12 +156,13 @@ else
                                                 }
                                                 else
                                                 {
-                                                    <td>@(projects.FirstOrDefault(pr => pr.Id == cp.Payment.ProjectId)?.Title ?? "Unbekanntes Projekt")</td>
+                                                    <td>@(projects.FirstOrDefault(pr => pr.Id == cp.Payment?.ProjectId)?.Title ?? "Unbekanntes Projekt")</td>
                                                     <td>@($"PM-{cp.Payment?.Id}")</td>
                                                     <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") - @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
                                                     <td>@(cp.Payment?.DetecatedTo?.ToString() ?? "-")</td>
                                                     <td>@cp.SharePercent%</td>
+                                                    <td>@(cp.SharePercent * contracts.FirstOrDefault(c => c.Id == cp.ContractId)?.Fte)%</td>
                                                     <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
                                                     <td>@(cp.End?.ToShortDateString() ?? "-")</td>
                                                     <td>
@@ -192,6 +194,7 @@ else
                                                     <span class="input-group-text">%</span>
                                                 </div>
                                             </td>
+                                            <td>%</td>
                                             <td>
                                                 <input type="date" class="form-control" @bind="paymentInputs[c.Id].Start" />
                                             </td>
@@ -220,7 +223,7 @@ else
     {
         Start = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
         End = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1),
-        Fte = 1.0f
+        Fte = 1.0m
     };
     private List<Employee> employees = new();
     private List<Project> projects = new();
@@ -377,7 +380,7 @@ else
             if (saved != null) contracts.Insert(0, saved);
 
             message = "Vertrag gespeichert.";
-            newContract = new Contract { Start = DateTime.Today, End = DateTime.Today.AddMonths(1), Fte = 1.0f };
+            newContract = new Contract { Start = DateTime.Today, End = DateTime.Today.AddMonths(1), Fte = 1.0m };
         }
         catch (Exception ex)
         {
