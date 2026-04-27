@@ -10,7 +10,7 @@ namespace oedibud.Models
         public int ProjectId { get; set; }
         public Project? Project { get; set; }
 
-        // Payment is now a period: Start .. End (Ablaufdatum)
+        public string Title { get; set; } = "";
         public DateTime Start { get; set; } = DateTime.Today;
         public DateTime End { get; set; } = DateTime.Today;
         public EmployeeGroup? DetecatedTo { get; set; } = null;

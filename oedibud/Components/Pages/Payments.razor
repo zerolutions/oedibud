@@ -19,6 +19,8 @@
             <option value="@pr.Id">@pr.Title</option>
         }
     </select>
+    <label>Titel</label>
+    <input type="text" class="form-control mb-2" @bind="newPayment.Title" />
     <label>Von</label>
     <input type="date" class="form-control mb-2" @bind="newPayment.Start" />
     <label>Bis</label>
@@ -48,7 +50,7 @@ else
 {
     <table class="table table-striped">
         <thead>
-            <tr><th>ID</th><th>Projekt</th><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
+            <tr><th>ID</th><th>Projekt</th><th>Titel</th><th>Von</th><th>Bis</th><th>Betrag</th><th>Gewidmet</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var p in payments)
@@ -64,6 +66,9 @@ else
                                     <option value="@pr.Id">@pr.Title</option>
                                 }
                             </select>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control mb-1" @bind="editPaymentCopy.Title" />
                         </td>
                         <td>
                             <input type="date" class="form-control mb-1" @bind="editPaymentCopy.Start" />
@@ -93,6 +98,7 @@ else
                     <tr>
                         <td>@p.Id</td>
                         <td>@(p.Project?.Title ?? "-")</td>
+                        <td>@(p.Title ?? "-")</td>
                         <td>@p.Start.ToShortDateString()</td>
                         <td>@p.End.ToShortDateString()</td>
                         <td>@p.Amount.ToString("C")</td>
@@ -222,6 +228,7 @@ else
     private class NewPaymentInputModel
     {
         public int ProjectId { get; set; }
+        public string Title { get; set; } = "";
         public DateTime Start { get; set; } = DateTime.Today;
         public DateTime End { get; set; } = DateTime.Today;
         public decimal Amount { get; set; }
@@ -384,6 +391,11 @@ else
             message = "Bitte ein Projekt auswählen.";
             return;
         }
+        if (newPayment.Title == "")
+        {
+            message = "Bitte einen Titel vergeben.";
+            return;
+        }
         if (newPayment.Amount == 0m)
         {
             message = "Betrag muss größer als 0 sein.";
@@ -396,6 +408,7 @@ else
             var toSave = new Payment
             {
                 ProjectId = newPayment.ProjectId,
+                Title = newPayment.Title,
                 Start = newPayment.Start,
                 End = newPayment.End,
                 Amount = newPayment.Amount,
@@ -413,7 +426,7 @@ else
             }
 
             // reset, keep project selection
-            newPayment = new NewPaymentInputModel { ProjectId = newPayment.ProjectId, Start = DateTime.Today, End = DateTime.Today };
+            newPayment = new NewPaymentInputModel { ProjectId = newPayment.ProjectId, Title = "", Start = DateTime.Today, End = DateTime.Today };
             message = "Projektmittel hinzugefügt.";
         }
         catch (Exception ex)
@@ -429,6 +442,7 @@ else
         {
             Id = p.Id,
             ProjectId = p.ProjectId,
+            Title = p.Title,
             Start = p.Start,
             End = p.End,
             Amount = p.Amount,
@@ -452,6 +466,7 @@ else
             if (dbItem != null)
             {
                 dbItem.ProjectId = editPaymentCopy.ProjectId;
+                dbItem.Title = editPaymentCopy.Title;
                 dbItem.Start = editPaymentCopy.Start;
                 dbItem.End = editPaymentCopy.End;
                 dbItem.Amount = editPaymentCopy.Amount;
@@ -463,6 +478,7 @@ else
                 {
                     payments[idx].Project = projects.FirstOrDefault(pr => pr.Id == editPaymentCopy.ProjectId) ?? payments[idx].Project;
                     payments[idx].ProjectId = editPaymentCopy.ProjectId;
+                    payments[idx].Title = editPaymentCopy.Title;
                     payments[idx].Start = editPaymentCopy.Start;
                     payments[idx].End = editPaymentCopy.End;
                     payments[idx].Amount = editPaymentCopy.Amount;

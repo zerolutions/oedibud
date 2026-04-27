@@ -354,8 +354,8 @@ public sealed class ForecastEngine
                     RootId: project.Id,
                     Kind: NodeKind.Intermediate,
                     Level: 1,
-                    Label: $"{payment.Amount:C0} {payment.DetecatedTo} | {payment.Start:MMM yy} - {payment.End:MMM yy}",
-                    Title: $"Projektmittel-ID {payment.Id} | ID PM-{payment.Id} | Gewidmet {payment.DetecatedTo}",
+                    Label: $"{payment.Title ?? "PM-"+payment.Id}",
+                    Title: $"Projektmittel-ID {payment.Id} | Betrag {payment.Amount:C0} | Gewidmet {payment.DetecatedTo} | {payment.Start:MMM yy} - {payment.End:MMM yy}",
                     Values: paymentValues,
                     ProjectId: project.Id,
                     PaymentId: payment.Id

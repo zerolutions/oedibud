@@ -69,11 +69,8 @@
     {
         var abs = Math.Abs(value);
 
-        if (abs >= 1_000_000)
-            return $"{value / 1_000_000:0.##}M €";
-
         if (abs >= 1_000)
-            return $"{value / 1_000:0.##}k €";
+            return $"{value / 1_000:0.}k €";
 
         return value.ToString("C0");
     }
@@ -99,6 +96,7 @@ else
     @* -------------------------
        Tabelle 1: Mitarbeiter-Sicht
        ------------------------- *@
+    <h4 class="mt-5 text-center">Personalübersicht</h4>
     <table class="table table-borderless mt-3 text-end">
         <thead>
             <tr>
@@ -166,7 +164,7 @@ else
         </tfoot>
     </table>
 
-    <h4 class="mt-5">Projektübersicht</h4>
+    <h4 class="mt-5 text-center">Projektübersicht</h4>
 
     @* -------------------------
        Tabelle 2: Projekt-Sicht
