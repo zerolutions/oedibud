@@ -248,6 +248,8 @@ public sealed class ForecastEngine
         // ---------------------------
         foreach (var project in projects.OrderBy(pr => pr.Title))
         {
+            
+
             var paymentResults = new Dictionary<int, decimal[]>();
             var paymentAllocations = new Dictionary<int, Dictionary<int, decimal[]>>();
 
@@ -375,7 +377,7 @@ public sealed class ForecastEngine
                         Kind: NodeKind.Allocation,
                         Level: 2,
                         Label: $"<em>{cp.Contract?.Employee?.Name ?? ""} > </em>AV-{cp.ContractId} {cp.Contract?.Employee?.Group} ({cp.SharePercent * cp.Contract?.Fte:00}%)",
-                        Title: $"Vertrag-ID {cp.ContractId} | Zuweisung {cp.Start:MMM yy} - {cp.End:MMM yy} | Projektmittel-ID {payment.Id}",
+                        Title: $"Vertrag-ID {cp.ContractId} | {cp.Contract?.Start:MMM yy} - {cp.Contract?.End:MMM yy} | Zuweisung {cp.Start:MMM yy} - {cp.End:MMM yy} | Projektmittel-ID {payment.Id}",
                         Values: negAlloc,
                         ProjectId: project.Id,
                         PaymentId: payment.Id,
