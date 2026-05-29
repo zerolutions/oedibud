@@ -1,0 +1,597 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using System.Linq
+@using oedibud.Models
+@using oedibud.Data
+@inject IDbContextFactory<BudgetDbContext> DbFactory
+@inject oedibud.Services.DataChangeNotifier Notifier
+
+@{
+    var displayPayments = FilterProjectId.HasValue
+        ? payments.Where(p => p.ProjectId == FilterProjectId.Value).OrderByDescending(p => p.Start).ToList()
+        : payments.OrderByDescending(p => p.Start).ToList();
+    bool showProjectCol = !FilterProjectId.HasValue;
+    int colSpan = showProjectCol ? 8 : 6;
+    string tableClass = Compact ? "table-sm table-hover w-100" : "table table-striped";
+}
+
+@if (!displayPayments.Any() && !ShowAddForm)
+{
+    <p><em>Keine Projektmittel vorhanden.</em></p>
+}
+else
+{
+    <table class="m-0 @tableClass">
+        <thead>
+            <tr>
+                @if (showProjectCol)
+                {
+                    <th>ID</th>
+                    <th>Projekt</th>
+                }
+                <th>Titel</th>
+                <th>Von</th>
+                <th>Bis</th>
+                <th>Betrag</th>
+                <th>Gewidmet</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in displayPayments)
+            {
+                <tr>
+                    @if (editingPaymentIds.Contains(p.Id))
+                    {
+                        @if (showProjectCol)
+                        {
+                            <td class="fst-italic">@p.Id</td>
+                            <td>
+                                <select class="form-control" @bind="editPaymentCopies[p.Id].ProjectId">
+                                    @foreach (var pr in projects)
+                                    {
+                                        <option value="@pr.Id">@pr.Title</option>
+                                    }
+                                </select>
+                            </td>
+                        }
+                        <td><input type="text" class="form-control" @bind="editPaymentCopies[p.Id].Title" /></td>
+                        <td><input type="date" class="form-control" @bind="editPaymentCopies[p.Id].Start" /></td>
+                        <td><input type="date" class="form-control" @bind="editPaymentCopies[p.Id].End" /></td>
+                        <td><input type="number" step="1" class="form-control" @bind="editPaymentCopies[p.Id].Amount" /></td>
+                        <td>
+                            <select class="form-control" @bind="editPaymentCopies[p.Id].DetecatedTo">
+                                <option value="">-- keine Angabe --</option>
+                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                {
+                                    <option value="@g">@g</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(p.Id)">Speichern</button>
+                            <button class="btn btn-sm btn-secondary me-1" @onclick="() => CancelEditPayment(p.Id)">Abbrechen</button>
+                            @if (ShowContractAssignments)
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Verträge")</button>
+                            }
+                        </td>
+                    }
+                    else
+                    {
+                        @if (showProjectCol)
+                        {
+                            <td class="fst-italic">@p.Id</td>
+                            <td>@(p.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == p.ProjectId)?.Title ?? "-")</td>
+                        }
+                        <td>@(p.Title ?? "-")</td>
+                        <td>@p.Start.ToShortDateString()</td>
+                        <td>@p.End.ToShortDateString()</td>
+                        <td>@p.Amount.ToString("C")</td>
+                        <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(p)">Bearbeiten</button>
+                            <button class="btn btn-sm btn-danger me-1" @onclick="() => DeletePayment(p)">Löschen</button>
+                            @if (ShowContractAssignments)
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">@(expanded.Contains(p.Id) ? "Verstecken" : "Verträge")</button>
+                            }
+                        </td>
+                    }
+                </tr>
+                @if (ShowContractAssignments && expanded.Contains(p.Id))
+                {
+                    <tr>
+                        <td colspan="@colSpan" class="p-0 bg-dark-subtle">
+                            <div class="p-3">
+                                @if (p.ContractPayments == null || p.ContractPayments.Count == 0)
+                                {
+                                    <em>Keine Arbeitsverträge zugewiesen</em>
+                                }
+                                <table class="table-sm table-hover w-100">
+                                    <thead>
+                                        <tr><th>Mitarbeiter</th><th>AV-ID</th><th>Lohnanteil</th><th>Reallohnanteil</th><th>Von</th><th>Bis</th><th></th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var cp in (p.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.SharePercent))
+                                        {
+                                            <tr>
+                                                @if (editingContractAssignIds.Contains(cp.Id))
+                                                {
+                                                    <td colspan="2">
+                                                        <select class="form-control" @bind="editContractAssignCopies[cp.Id].ContractId">
+                                                            <option value="@editContractAssignCopies[cp.Id].ContractId">@GetContractLabel(cp.ContractId)</option>
+                                                            @foreach (var c in AvailableContractsForPayment(p))
+                                                            {
+                                                                <option value="@c.Id">@GetContractLabel(c.Id)</option>
+                                                            }
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <div class="input-group">
+                                                            <input type="number" class="form-control" step="1" min="0" max="100" @bind="editContractAssignCopies[cp.Id].SharePercent" />
+                                                            <span class="input-group-text">%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>@(editContractAssignCopies[cp.Id].SharePercent * (contracts.FirstOrDefault(c => c.Id == editContractAssignCopies[cp.Id].ContractId)?.Fte ?? 0))%</td>
+                                                    <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
+                                                    <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractAssignment(cp.Id, p)">Speichern</button>
+                                                        <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractAssignment(cp.Id)">Abbrechen</button>
+                                                    </td>
+                                                }
+                                                else
+                                                {
+                                                    <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                                                    <td>AV-@cp.ContractId</td>
+                                                    <td>@cp.SharePercent%</td>
+                                                    <td>@(cp.SharePercent * (cp.Contract?.Fte ?? 0))%</td>
+                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractAssignment(cp)">Bearbeiten</button>
+                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, p)">Entfernen</button>
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                        <tr>
+                                            <td colspan="2">
+                                                <select class="form-control" @bind="GetOrAddContractAssignInput(p.Id).ContractId">
+                                                    <option value="0">-- auswählen --</option>
+                                                    @foreach (var c in AvailableContractsForPayment(p))
+                                                    {
+                                                        <option value="@c.Id">@GetContractLabel(c.Id)</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control" step="1" min="0" max="100" @bind="GetOrAddContractAssignInput(p.Id).SharePercent" />
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                            </td>
+                                            <td></td>
+                                            <td><input type="date" class="form-control" @bind="GetOrAddContractAssignInput(p.Id).Start" /></td>
+                                            <td><input type="date" class="form-control" @bind="GetOrAddContractAssignInput(p.Id).End" /></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-success" @onclick="() => AddContractAssignment(p)">Zuweisen</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            @if (ShowAddForm)
+            {
+                <tr>
+                    @if (showProjectCol)
+                    {
+                        <td class="fst-italic text-muted">neu</td>
+                        <td>
+                            <select class="form-control" @bind="newPaymentInput.ProjectId">
+                                <option value="0">-- auswählen --</option>
+                                @foreach (var pr in projects)
+                                {
+                                    <option value="@pr.Id">@pr.Title</option>
+                                }
+                            </select>
+                        </td>
+                    }
+                    <td><input type="text" class="form-control" placeholder="Titel" @bind="newPaymentInput.Title" /></td>
+                    <td><input type="date" class="form-control" @bind="newPaymentInput.Start" /></td>
+                    <td><input type="date" class="form-control" @bind="newPaymentInput.End" /></td>
+                    <td><input type="number" step="1" class="form-control" @bind="newPaymentInput.Amount" /></td>
+                    <td>
+                        <select class="form-control" @bind="newPaymentInput.DetecatedTo">
+                            <option value="">-- keine Angabe --</option>
+                            @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                            {
+                                <option value="@g">@g</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-success" @onclick="AddPayment">Hinzufügen</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public List<Payment> payments { get; set; } = new();
+    [Parameter] public List<Project> projects { get; set; } = new();
+    [Parameter] public List<Contract> contracts { get; set; } = new();
+    [Parameter] public int? FilterProjectId { get; set; }
+    [Parameter] public bool ShowContractAssignments { get; set; } = false;
+    [Parameter] public bool ShowAddForm { get; set; } = true;
+    [Parameter] public bool Compact { get; set; } = false;
+    [Parameter] public EventCallback<string> OnMessageChanged { get; set; }
+
+    private class PaymentInput
+    {
+        public int ProjectId { get; set; }
+        public string Title { get; set; } = "";
+        public DateTime Start { get; set; } = DateTime.Today;
+        public DateTime End { get; set; } = DateTime.Today;
+        public decimal Amount { get; set; }
+        public EmployeeGroup? DetecatedTo { get; set; }
+    }
+
+    private class ContractAssignInput
+    {
+        public int ContractId { get; set; }
+        public int SharePercent { get; set; } = 100;
+        public DateTime? Start { get; set; }
+        public DateTime? End { get; set; }
+    }
+
+    private PaymentInput newPaymentInput = new();
+    private HashSet<int> editingPaymentIds = new();
+    private Dictionary<int, Payment> editPaymentCopies = new();
+
+    private HashSet<int> expanded = new();
+    private Dictionary<int, ContractAssignInput> contractAssignInputs = new();
+    private HashSet<int> editingContractAssignIds = new();
+    private Dictionary<int, ContractPayment> editContractAssignCopies = new();
+
+    protected override void OnInitialized()
+    {
+        newPaymentInput.ProjectId = FilterProjectId ?? 0;
+        // init start/end from first project if filtering
+        if (FilterProjectId.HasValue)
+        {
+            var proj = projects.FirstOrDefault(p => p.Id == FilterProjectId.Value);
+            if (proj != null)
+            {
+                newPaymentInput.Start = proj.Start;
+                newPaymentInput.End = proj.End;
+            }
+        }
+    }
+
+    private ContractAssignInput GetOrAddContractAssignInput(int paymentId)
+    {
+        if (!contractAssignInputs.TryGetValue(paymentId, out var input))
+        {
+            input = new ContractAssignInput();
+            contractAssignInputs[paymentId] = input;
+        }
+        return input;
+    }
+
+    private IEnumerable<Contract> AvailableContractsForPayment(Payment p)
+    {
+        var paymentGroup = p.DetecatedTo;
+        var assignedIds = p.ContractPayments?.Select(x => x.ContractId).ToHashSet() ?? new HashSet<int>();
+        return contracts.Where(c => !assignedIds.Contains(c.Id) &&
+            (paymentGroup == null || (c.Employee != null && c.Employee.Group == paymentGroup)));
+    }
+
+    private string GetContractLabel(int contractId)
+    {
+        var c = contracts.FirstOrDefault(x => x.Id == contractId);
+        if (c == null) return $"AV-{contractId}";
+        return $"{c.Employee?.Name ?? "-"} | AV-{c.Id} ({c.Start.ToShortDateString()} – {c.End.ToShortDateString()})";
+    }
+
+    private void ToggleExpand(int paymentId)
+    {
+        if (!expanded.Remove(paymentId))
+        {
+            expanded.Add(paymentId);
+            if (!contractAssignInputs.ContainsKey(paymentId))
+                contractAssignInputs[paymentId] = new ContractAssignInput();
+        }
+    }
+
+    // --- Payment CRUD ---
+
+    private void EditPayment(Payment p)
+    {
+        editingPaymentIds.Add(p.Id);
+        editPaymentCopies[p.Id] = new Payment
+        {
+            Id = p.Id,
+            ProjectId = p.ProjectId,
+            Title = p.Title,
+            Start = p.Start,
+            End = p.End,
+            Amount = p.Amount,
+            DetecatedTo = p.DetecatedTo,
+            Project = p.Project
+        };
+    }
+
+    private void CancelEditPayment(int id)
+    {
+        editingPaymentIds.Remove(id);
+        editPaymentCopies.Remove(id);
+    }
+
+    private async Task SavePayment(int id)
+    {
+        if (!editPaymentCopies.TryGetValue(id, out var copy)) return;
+        if (string.IsNullOrWhiteSpace(copy.Title))
+        {
+            await OnMessageChanged.InvokeAsync("Bitte einen Titel vergeben.");
+            return;
+        }
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Payments.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.ProjectId = copy.ProjectId;
+                dbItem.Title = copy.Title;
+                dbItem.Start = copy.Start;
+                dbItem.End = copy.End;
+                dbItem.Amount = copy.Amount;
+                dbItem.DetecatedTo = copy.DetecatedTo;
+                await db.SaveChangesAsync();
+
+                var idx = payments.FindIndex(x => x.Id == id);
+                if (idx >= 0)
+                {
+                    payments[idx].ProjectId = dbItem.ProjectId;
+                    payments[idx].Project = projects.FirstOrDefault(pr => pr.Id == dbItem.ProjectId) ?? payments[idx].Project;
+                    payments[idx].Title = dbItem.Title;
+                    payments[idx].Start = dbItem.Start;
+                    payments[idx].End = dbItem.End;
+                    payments[idx].Amount = dbItem.Amount;
+                    payments[idx].DetecatedTo = dbItem.DetecatedTo;
+                }
+                await OnMessageChanged.InvokeAsync("Projektmittel gespeichert.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnMessageChanged.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            CancelEditPayment(id);
+        }
+    }
+
+    private async Task AddPayment()
+    {
+        var projectId = FilterProjectId ?? newPaymentInput.ProjectId;
+        if (projectId == 0)
+        {
+            await OnMessageChanged.InvokeAsync("Bitte ein Projekt auswählen.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(newPaymentInput.Title))
+        {
+            await OnMessageChanged.InvokeAsync("Bitte einen Titel vergeben.");
+            return;
+        }
+        if (newPaymentInput.Amount == 0m)
+        {
+            await OnMessageChanged.InvokeAsync("Betrag muss größer als 0 sein.");
+            return;
+        }
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var toSave = new Payment
+            {
+                ProjectId = projectId,
+                Title = newPaymentInput.Title,
+                Start = newPaymentInput.Start,
+                End = newPaymentInput.End,
+                Amount = newPaymentInput.Amount,
+                DetecatedTo = newPaymentInput.DetecatedTo
+            };
+            db.Payments.Add(toSave);
+            await db.SaveChangesAsync();
+
+            var saved = await db.Payments.Include(p => p.Project).FirstOrDefaultAsync(p => p.Id == toSave.Id);
+            if (saved != null)
+            {
+                saved.ContractPayments = new List<ContractPayment>();
+                payments.Insert(0, saved);
+            }
+            Notifier.Notify();
+            await OnMessageChanged.InvokeAsync("Projektmittel hinzugefügt.");
+
+            // reset input, keep project/dates if filtered
+            if (FilterProjectId.HasValue)
+            {
+                var proj = projects.FirstOrDefault(p => p.Id == FilterProjectId.Value);
+                newPaymentInput = new PaymentInput
+                {
+                    ProjectId = FilterProjectId.Value,
+                    Start = proj?.Start ?? DateTime.Today,
+                    End = proj?.End ?? DateTime.Today
+                };
+            }
+            else
+            {
+                newPaymentInput = new PaymentInput { ProjectId = newPaymentInput.ProjectId };
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnMessageChanged.InvokeAsync(ex.Message);
+        }
+    }
+
+    private async Task DeletePayment(Payment p)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var item = await db.Payments.FindAsync(p.Id);
+            if (item != null)
+            {
+                db.Payments.Remove(item);
+                await db.SaveChangesAsync();
+                payments.RemoveAll(x => x.Id == p.Id);
+                contractAssignInputs.Remove(p.Id);
+                Notifier.Notify();
+                await OnMessageChanged.InvokeAsync("Projektmittel gelöscht.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnMessageChanged.InvokeAsync(ex.Message);
+        }
+    }
+
+    // --- Contract Assignment CRUD ---
+
+    private void EditContractAssignment(ContractPayment cp)
+    {
+        editingContractAssignIds.Add(cp.Id);
+        editContractAssignCopies[cp.Id] = new ContractPayment
+        {
+            Id = cp.Id,
+            ContractId = cp.ContractId,
+            PaymentId = cp.PaymentId,
+            SharePercent = cp.SharePercent,
+            Start = cp.Start,
+            End = cp.End
+        };
+    }
+
+    private void CancelEditContractAssignment(int id)
+    {
+        editingContractAssignIds.Remove(id);
+        editContractAssignCopies.Remove(id);
+    }
+
+    private async Task SaveContractAssignment(int id, Payment p)
+    {
+        if (!editContractAssignCopies.TryGetValue(id, out var copy)) return;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.ContractPayments.FindAsync(id);
+            if (dbItem != null)
+            {
+                dbItem.SharePercent = copy.SharePercent;
+                dbItem.Start = copy.Start;
+                dbItem.End = copy.End;
+                dbItem.ContractId = copy.ContractId;
+                await db.SaveChangesAsync();
+
+                var idx = p.ContractPayments?.FindIndex(x => x.Id == id) ?? -1;
+                if (idx >= 0)
+                {
+                    p.ContractPayments[idx].SharePercent = dbItem.SharePercent;
+                    p.ContractPayments[idx].Start = dbItem.Start;
+                    p.ContractPayments[idx].End = dbItem.End;
+                    p.ContractPayments[idx].ContractId = dbItem.ContractId;
+                    var loaded = await db.ContractPayments
+                        .Include(x => x.Contract).ThenInclude(c => c.Employee)
+                        .FirstOrDefaultAsync(x => x.Id == id);
+                    if (loaded != null) p.ContractPayments[idx].Contract = loaded.Contract;
+                }
+                Notifier.Notify();
+                await OnMessageChanged.InvokeAsync("Zuweisung gespeichert.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnMessageChanged.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            CancelEditContractAssignment(id);
+        }
+    }
+
+    private async Task AddContractAssignment(Payment p)
+    {
+        var input = GetOrAddContractAssignInput(p.Id);
+        if (input.ContractId == 0)
+        {
+            await OnMessageChanged.InvokeAsync("Bitte einen Vertrag auswählen.");
+            return;
+        }
+        if (input.SharePercent < 0 || input.SharePercent > 100)
+        {
+            await OnMessageChanged.InvokeAsync("Lohnanteil muss zwischen 0 und 100 liegen.");
+            return;
+        }
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var cp = new ContractPayment
+            {
+                PaymentId = p.Id,
+                ContractId = input.ContractId,
+                SharePercent = input.SharePercent,
+                Start = input.Start,
+                End = input.End
+            };
+            db.Add(cp);
+            await db.SaveChangesAsync();
+
+            var loaded = await db.ContractPayments
+                .Include(x => x.Contract).ThenInclude(c => c.Employee)
+                .FirstOrDefaultAsync(x => x.Id == cp.Id);
+            if (loaded != null)
+            {
+                p.ContractPayments ??= new List<ContractPayment>();
+                p.ContractPayments.Add(loaded);
+            }
+            Notifier.Notify();
+            await OnMessageChanged.InvokeAsync("Vertrag zugewiesen.");
+            contractAssignInputs[p.Id] = new ContractAssignInput();
+        }
+        catch (Exception ex)
+        {
+            await OnMessageChanged.InvokeAsync(ex.Message);
+        }
+    }
+
+    private async Task DeleteContractAssignment(int contractPaymentId, Payment p)
+    {
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var item = await db.ContractPayments.FindAsync(contractPaymentId);
+            if (item != null)
+            {
+                db.ContractPayments.Remove(item);
+                await db.SaveChangesAsync();
+                p.ContractPayments?.RemoveAll(x => x.Id == contractPaymentId);
+                Notifier.Notify();
+                await OnMessageChanged.InvokeAsync("Zuweisung entfernt.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnMessageChanged.InvokeAsync(ex.Message);
+        }
+    }
+}

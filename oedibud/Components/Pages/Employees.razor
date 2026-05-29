@@ -1,8 +1,6 @@
-﻿@page "/employees"
+@page "/employees"
 
-@using Blazorise
 @using Microsoft.EntityFrameworkCore
-@using Microsoft.AspNetCore.Components.Forms
 @using System.Linq
 @using oedibud.Models
 @using oedibud.Data
@@ -13,36 +11,12 @@
 <h3 class="text-primary-emphasis">Mitarbeiter</h3>
 <hr/>
 
-<div class="mb-3">
-    <label>Name</label> <input @bind="employee.Name" class="form-control mb-2" />
-    <label>Eingestellt am</label><input type="date" @bind="employee.HireDate" class="form-control mb-2" />
-    <label>Gruppe</label>
-    <select @bind="employee.Group" class="form-control mb-2">
-        @foreach (var g in Enum.GetValues<EmployeeGroup>())
-        {
-            <option value="@g">@GetGroupName(g)</option>
-        }
-    </select>
-    <label>Angerechnete Erfahrung (Monate)</label><input type="number" @bind="employee.ExperienceMonth" class="form-control mb-2" />
-    <label>Arbeitgeber Faktor</label><input type="number" @bind="employee.BruttoFactor" class="form-control mb-2" />
-    <button type="button" class="btn btn-primary mt-2" @onclick="Add">Mitarbeiter hinzufügen</button>
-</div>
-
-<!-- Feedback für den Benutzer -->
 @if (!string.IsNullOrEmpty(message))
 {
-    <p class="text-info">@message</p>
+    <div class="alert alert-info">@message</div>
 }
 
-<hr />
-
-@if (employees.Count == 0)
-{
-    <p>Keine Mitarbeiter vorhanden.</p>
-}
-else
-{
-    <table class="table table-striped">
+<table class="table table-striped">
         <thead>
             <tr>
                 <th>ID</th>
@@ -104,65 +78,41 @@ else
                 {
                     <tr>
                         <td colspan="10" class="p-0 bg-dark-subtle">
-                            <div class="p-3 ">
-                                @if (!contractsByEmployee.ContainsKey(e.Id) || contractsByEmployee[e.Id].Count == 0)
-                                {
-                            <em>Keine Arbeitsverträge zugewiesen</em>
-                    }
-                                    <table class="table-sm">
-                                        <thead>
-                                            <tr><th>Start</th><th>Ende</th><th>FTE</th><th></th></tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var c in contractsByEmployee[e.Id].OrderByDescending(c => c.Start))
-                                            {
-                                                <tr>
-                                                    @if (editingContractIds.Contains(c.Id))
-                                                    {
-                                                        <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].Start" /></td>
-                                                        <td><input type="date" class="form-control" @bind="editContractCopies[c.Id].End" /></td>
-                                                        <td><input type="number" step="1" min="0" max="100" class="form-control" @bind="editContractCopies[c.Id].FtePercent" /></td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContract(c.Id)">Speichern</button>
-                                                            <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
-                                                        </td>
-                                                    }
-                                                    else
-                                                    {
-                                                        <td>@c.Start.ToShortDateString()</td>
-                                                        <td>@c.End.ToShortDateString()</td>
-                                                        <td>@c.FtePercent</td>
-                                                        <td>
-                                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContract(c)">Bearbeiten</button>
-                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteContract(c.Id)">Löschen</button>
-                                                        </td>
-                                                    }
-                                                </tr>
-                                            }
-                                        <tr>
-                                            <td>
-                                                <input type="date" class="form-control" @bind="contractInputs[e.Id].Start" />
-                                            </td>
-                                            <td>
-                                                <input type="date" class="form-control" @bind="contractInputs[e.Id].End" />
-                                            </td>
-                                                <td><input type="number" step="1" min="0" max="100" class="form-control" @bind="contractInputs[e.Id].FtePercent"/></td>
-                                                <td>
-                                                <button class="btn btn-success" @onclick="() => AddContractForEmployee(e.Id)">Hinzufügen</button>
-
-                                                </td>
-                                            
-                                        </tr>
-                                        </tbody>
-                                    </table>
+                            <div class="p-3">
+                                <ContractTable 
+                                    contracts="allContracts"
+                                    employees="employees"
+                                    FilterEmployeeId="e.Id"
+                                    ShowAddForm="true"
+                                    Compact="true"
+                                    OnMessageChanged="HandleContractMessage" />
                             </div>
                         </td>
                     </tr>
                 }
             }
         </tbody>
+        <tfoot>
+            <tr>
+                <td class="fst-italic text-muted">neu</td>
+                <td><input class="form-control" placeholder="Name" @bind="employee.Name" /></td>
+                <td><input type="date" class="form-control" @bind="employee.HireDate" /></td>
+                <td>
+                    <select class="form-control" @bind="employee.Group">
+                        @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                        {
+                            <option value="@g">@GetGroupName(g)</option>
+                        }
+                    </select>
+                </td>
+                <td><input type="number" class="form-control" @bind="employee.ExperienceMonth" /></td>
+                <td></td>
+                <td></td>
+                <td><input type="number" class="form-control" @bind="employee.BruttoFactor" /></td>
+                <td><button type="button" class="btn btn-sm btn-success" @onclick="Add">Hinzufügen</button></td>
+            </tr>
+        </tfoot>
     </table>
-}
 
 @code {
     private Employee employee = new()
@@ -172,15 +122,8 @@ else
     };
 
     private List<Employee> employees = new();
-    // contracts grouped by employee id
-    private Dictionary<int, List<Contract>> contractsByEmployee = new();
-    private class ContractInput
-    {
-        public DateTime Start { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-        public DateTime End { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1);
-        public decimal FtePercent { get; set; } = 100m;
-    }
-    private Dictionary<int, ContractInput> contractInputs = new();
+    private List<Contract> allContracts = new();
+    
     private string message = "";
     private HashSet<int> expanded = new();
 
@@ -197,17 +140,10 @@ else
             .OrderByDescending(e => e.HireDate)
             .ToListAsync();
 
-        var allContracts = await db.Contracts.Include(c => c.Employee).OrderByDescending(c => c.Start).ToListAsync();
-        contractsByEmployee = allContracts.GroupBy(c => c.EmployeeId).ToDictionary(g => g.Key, g => g.ToList());
-
-        // ensure contractInputs entries exist for each employee
-        foreach (var emp in employees)
-        {
-            if (!contractInputs.ContainsKey(emp.Id))
-                contractInputs[emp.Id] = new ContractInput();
-            if (!contractsByEmployee.ContainsKey(emp.Id))
-                contractsByEmployee[emp.Id] = new List<Contract>();
-        }
+        allContracts = await db.Contracts
+            .Include(c => c.Employee)
+            .OrderByDescending(c => c.Start)
+            .ToListAsync();
     }
 
     private async Task Add()
@@ -242,7 +178,7 @@ else
         }
         catch (Exception ex)
         {
-            message = ex.ToString(); // wichtig zum Debuggen!
+            message = ex.ToString();
         }
     }
 
@@ -258,14 +194,11 @@ else
             message = $"Mitarbeiter '{e.Name}' gelöscht!";
 
             employees.Remove(e);
-            // remove any cached contracts
-            contractsByEmployee.Remove(e.Id);
-            contractInputs.Remove(e.Id);
-
+            allContracts.RemoveAll(c => c.EmployeeId == e.Id);
         }
         catch (Exception ex)
         {
-            message = ex.ToString(); // wichtig zum Debuggen!
+            message = ex.ToString();
         }
     }
 
@@ -287,83 +220,12 @@ else
         if (!expanded.Remove(employeeId))
         {
             expanded.Add(employeeId);
-            if (!contractInputs.ContainsKey(employeeId))
-                contractInputs[employeeId] = new ContractInput();
-            if (!contractsByEmployee.ContainsKey(employeeId))
-                contractsByEmployee[employeeId] = new List<Contract>();
         }
     }
 
-    private async Task AddContractForEmployee(int employeeId)
-    {
-        if (!contractInputs.TryGetValue(employeeId, out var input))
-            return;
-        if (input.End < input.Start)
-        {
-            message = "Ende darf nicht vor dem Start liegen.";
-            return;
-        }
-
-        try
-        {
-            using var db = DbFactory.CreateDbContext();
-            var toSave = new Contract
-            {
-                EmployeeId = employeeId,
-                Start = input.Start,
-                End = input.End,
-                FtePercent = input.FtePercent
-            };
-            db.Contracts.Add(toSave);
-            await db.SaveChangesAsync();
-
-            var saved = await db.Contracts.Include(c => c.Employee).FirstOrDefaultAsync(c => c.Id == toSave.Id);
-            if (saved != null)
-            {
-                if (!contractsByEmployee.ContainsKey(employeeId)) contractsByEmployee[employeeId] = new List<Contract>();
-                contractsByEmployee[employeeId].Insert(0, saved);
-            }
-
-            message = "Vertrag gespeichert.";
-            contractInputs[employeeId] = new ContractInput();
-        }
-        catch (Exception ex)
-        {
-            message = ex.Message;
-        }
-    }
-
-    private async Task DeleteContract(int id)
-    {
-        try
-        {
-            using var db = DbFactory.CreateDbContext();
-            var item = await db.Contracts.FindAsync(id);
-            if (item != null)
-            {
-                db.Contracts.Remove(item);
-                await db.SaveChangesAsync();
-
-                // remove from local cache
-                foreach (var kv in contractsByEmployee)
-                {
-                    kv.Value.RemoveAll(c => c.Id == id);
-                }
-                message = "Vertrag gelöscht.";
-            }
-        }
-        catch (Exception ex)
-        {
-            message = ex.Message;
-        }
-    }
-
-    // --- Inline editing support ---
+    // --- Inline editing support for Employees ---
     private int? editingEmployeeId = null;
     private Dictionary<int, Employee> editEmployeeCopies = new();
-
-    private HashSet<int> editingContractIds = new();
-    private Dictionary<int, Contract> editContractCopies = new();
 
     private void EditEmployee(Employee e)
     {
@@ -395,7 +257,6 @@ else
                 dbItem.BruttoFactor = copy.BruttoFactor;
                 await db.SaveChangesAsync();
 
-                // update local list
                 var idx = employees.FindIndex(x => x.Id == id);
                 if (idx >= 0)
                 {
@@ -425,61 +286,9 @@ else
         if (editingEmployeeId == id) editingEmployeeId = null;
     }
 
-    private void EditContract(Contract c)
+    private async Task HandleContractMessage(string msg)
     {
-        editingContractIds.Add(c.Id);
-        editContractCopies[c.Id] = new Contract
-        {
-            Id = c.Id,
-            EmployeeId = c.EmployeeId,
-            Start = c.Start,
-            End = c.End,
-            Fte = c.Fte
-        };
-    }
-
-    private async Task SaveContract(int id)
-    {
-        if (!editContractCopies.TryGetValue(id, out var copy)) return;
-        try
-        {
-            using var db = DbFactory.CreateDbContext();
-            var dbItem = await db.Contracts.FindAsync(id);
-            if (dbItem != null)
-            {
-                dbItem.Start = copy.Start;
-                dbItem.End = copy.End;
-                dbItem.Fte = copy.Fte;
-                await db.SaveChangesAsync();
-
-                // update local cache
-                foreach (var kv in contractsByEmployee)
-                {
-                    var idx = kv.Value.FindIndex(x => x.Id == id);
-                    if (idx >= 0)
-                    {
-                        kv.Value[idx].Start = dbItem.Start;
-                        kv.Value[idx].End = dbItem.End;
-                        kv.Value[idx].Fte = dbItem.Fte;
-                    }
-                }
-                message = "Vertrag gespeichert.";
-            }
-        }
-        catch (Exception ex)
-        {
-            message = ex.Message;
-        }
-        finally
-        {
-            editContractCopies.Remove(id);
-            editingContractIds.Remove(id);
-        }
-    }
-
-    private void CancelEditContract(int id)
-    {
-        editContractCopies.Remove(id);
-        editingContractIds.Remove(id);
+        message = msg;
+        await InvokeAsync(StateHasChanged);
     }
 }
