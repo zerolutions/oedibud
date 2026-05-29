@@ -18,6 +18,25 @@
 <body>
     <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
+    <script>
+        window.subtableOverlay = {
+            _current: null,
+            set: function (dotNet) {
+                this._current = dotNet;
+            },
+            clear: function () {
+                this._current = null;
+            },
+            focus: function (el) {
+                if (el) el.focus();
+            }
+        };
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && window.subtableOverlay._current) {
+                window.subtableOverlay._current.invokeMethodAsync('CloseFromJs');
+            }
+        });
+    </script>
 </body>
 
 </html>

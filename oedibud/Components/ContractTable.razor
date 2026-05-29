@@ -7,7 +7,9 @@
 @{
     var displayContracts = GetFilteredContracts();
     int colSpan = FilterEmployeeId.HasValue ? 5 : 6;
-    string tableClass = Compact ? "table-sm table-hover w-100" : "table table-striped";
+    string tableClass = Compact ? "table table-sm" : "table table-striped";
+    string overlayTitle = overlayContract == null ? "" :
+        $"Projektmittel · AV-{overlayContract.Id} · {overlayContract.Employee?.Name ?? employees.FirstOrDefault(e => e.Id == overlayContract.EmployeeId)?.Name ?? "-"} · {overlayContract.Start.ToShortDateString()} – {overlayContract.End.ToShortDateString()} ({overlayContract.FtePercent}%)";
 }
 
 @if (!displayContracts.Any() && !ShowAddForm)
@@ -49,9 +51,7 @@ else
                             <button class="btn btn-sm btn-secondary me-1" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
                             @if (ShowContractPayments)
                             {
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">
-                                    @(expanded.Contains(c.Id) ? "Verstecken" : "Projektmittel")
-                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowContractOverlay(c)">Projektmittel zuweisen</button>
                             }
                         </td>
                     }
@@ -70,111 +70,11 @@ else
                             <button class="btn btn-sm btn-danger me-1" @onclick="() => DeleteContract(c.Id)">Löschen</button>
                             @if (ShowContractPayments)
                             {
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(c.Id)">
-                                    @(expanded.Contains(c.Id) ? "Verstecken" : "Projektmittel")
-                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowContractOverlay(c)">Projektmittel zuweisen</button>
                             }
                         </td>
                     }
                 </tr>
-                @if (ShowContractPayments && expanded.Contains(c.Id))
-                {
-                    <tr>
-                        <td colspan="@colSpan" class="p-0 bg-dark-subtle">
-                            <div class="p-3">
-                                @if (c.ContractPayments == null || c.ContractPayments.Count == 0)
-                                {
-                                    <em>Keine Projektmittel zugewiesen</em>
-                                }
-                                <table class="table-sm table-hover w-100">
-                                    <thead>
-                                        <tr>
-                                            <th>Projekt</th>
-                                            <th>PM-ID</th>
-                                            <th>Zeitraum</th>
-                                            <th>Betrag</th>
-                                            <th>Lohnanteil</th>
-                                            <th>Reallohnanteil</th>
-                                            <th>Von</th>
-                                            <th>Bis</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var cp in (c.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.Payment?.Start))
-                                        {
-                                            <tr>
-                                                @if (editingContractPaymentIds.Contains(cp.Id))
-                                                {
-                                                    <td colspan="4">
-                                                        <select class="form-control" @bind="editContractPaymentCopies[cp.Id].PaymentId">
-                                                            <option value="@editContractPaymentCopies[cp.Id].PaymentId">@GetPaymentLabel(cp.PaymentId)</option>
-                                                            @foreach (var p in AvailablePaymentsForContract(c))
-                                                            {
-                                                                <option value="@p.Id">@GetPaymentLabel(p.Id)</option>
-                                                            }
-                                                        </select>
-                                                    </td>
-                                                    <td>
-                                                        <div class="input-group">
-                                                            <input type="number" class="form-control" step="1" min="0" max="100" @bind="editContractPaymentCopies[cp.Id].SharePercent" />
-                                                            <span class="input-group-text">%</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>-</td>
-                                                    <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
-                                                    <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
-                                                    <td>
-                                                        <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractPayment(cp.Id, c)">Speichern</button>
-                                                        <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractPayment(cp.Id)">Abbrechen</button>
-                                                    </td>
-                                                }
-                                                else
-                                                {
-                                                    <td>@(cp.Payment?.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == cp.Payment?.ProjectId)?.Title ?? "-")</td>
-                                                    <td>PM-@cp.PaymentId</td>
-                                                    <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") – @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
-                                                    <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
-                                                    <td>@cp.SharePercent%</td>
-                                                    <td>@(cp.SharePercent * c.Fte)%</td>
-                                                    <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
-                                                    <td>@(cp.End?.ToShortDateString() ?? "-")</td>
-                                                    <td>
-                                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractPayment(cp)">Bearbeiten</button>
-                                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, c)">Entfernen</button>
-                                                    </td>
-                                                }
-                                            </tr>
-                                        }
-                                        <tr>
-                                            <td colspan="4">
-                                                <select class="form-control" @bind="GetOrAddContractPaymentInput(c.Id).PaymentId">
-                                                    <option value="0">-- auswählen --</option>
-                                                    @foreach (var p in AvailablePaymentsForContract(c))
-                                                    {
-                                                        <option value="@p.Id">@GetPaymentLabel(p.Id)</option>
-                                                    }
-                                                </select>
-                                            </td>
-                                            <td>
-                                                <div class="input-group">
-                                                    <input type="number" class="form-control" step="1" min="0" max="100" @bind="GetOrAddContractPaymentInput(c.Id).SharePercent" />
-                                                    <span class="input-group-text">%</span>
-                                                </div>
-                                            </td>
-                                            <td></td>
-                                            <td><input type="date" class="form-control" @bind="GetOrAddContractPaymentInput(c.Id).Start" /></td>
-                                            <td><input type="date" class="form-control" @bind="GetOrAddContractPaymentInput(c.Id).End" /></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-success" @onclick="() => AddContractPayment(c)">Hinzufügen</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                }
             }
             @if (ShowAddForm)
             {
@@ -202,6 +102,101 @@ else
             }
         </tbody>
     </table>
+
+    <SubTableOverlay IsVisible="overlayContract != null" Title="@overlayTitle" OnClose="CloseContractOverlay">
+        @if (overlayContract != null)
+        {
+            @if (overlayContract.ContractPayments == null || overlayContract.ContractPayments.Count == 0)
+            {
+                <em>Keine Projektmittel zugewiesen.</em>
+            }
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Projekt</th>
+                        <th>PM-ID</th>
+                        <th>Zeitraum</th>
+                        <th>Betrag</th>
+                        <th>Lohnanteil</th>
+                        <th>Reallohnanteil</th>
+                        <th>Von</th>
+                        <th>Bis</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cp in (overlayContract.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.Payment?.Start))
+                    {
+                        <tr>
+                            @if (editingContractPaymentIds.Contains(cp.Id))
+                            {
+                                <td colspan="4">
+                                    <select class="form-control" @bind="editContractPaymentCopies[cp.Id].PaymentId">
+                                        <option value="@editContractPaymentCopies[cp.Id].PaymentId">@GetPaymentLabel(cp.PaymentId)</option>
+                                        @foreach (var p in AvailablePaymentsForContract(overlayContract))
+                                        {
+                                            <option value="@p.Id">@GetPaymentLabel(p.Id)</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" step="1" min="0" max="100" @bind="editContractPaymentCopies[cp.Id].SharePercent" />
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </td>
+                                <td>-</td>
+                                <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].Start" /></td>
+                                <td><input type="date" class="form-control" @bind="editContractPaymentCopies[cp.Id].End" /></td>
+                                <td>
+                                    <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractPayment(cp.Id, overlayContract)">Speichern</button>
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractPayment(cp.Id)">Abbrechen</button>
+                                </td>
+                            }
+                            else
+                            {
+                                <td>@(cp.Payment?.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == cp.Payment?.ProjectId)?.Title ?? "-")</td>
+                                <td>PM-@cp.PaymentId</td>
+                                <td>@(cp.Payment?.Start.ToShortDateString() ?? "-") – @(cp.Payment?.End.ToShortDateString() ?? "-")</td>
+                                <td>@(cp.Payment?.Amount.ToString("C") ?? "-")</td>
+                                <td>@cp.SharePercent%</td>
+                                <td>@(cp.SharePercent * overlayContract.Fte)%</td>
+                                <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
+                                <td>@(cp.End?.ToShortDateString() ?? "-")</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractPayment(cp)">Bearbeiten</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractPayment(cp.Id, overlayContract)">Entfernen</button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                    <tr>
+                        <td colspan="4">
+                        <select class="form-control" @bind="GetOrAddContractPaymentInput(overlayContract.Id).PaymentId">
+                                <option value="0">-- auswählen --</option>
+                                @foreach (var p in AvailablePaymentsForContract(overlayContract))
+                                {
+                                    <option value="@p.Id">@GetPaymentLabel(p.Id)</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <div class="input-group">
+                                <input type="number" class="form-control" step="1" min="0" max="100" @bind="GetOrAddContractPaymentInput(overlayContract.Id).SharePercent" />
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </td>
+                        <td></td>
+                        <td><input type="date" class="form-control" @bind="GetOrAddContractPaymentInput(overlayContract.Id).Start" /></td>
+                        <td><input type="date" class="form-control" @bind="GetOrAddContractPaymentInput(overlayContract.Id).End" /></td>
+                        <td>
+                            <button class="btn btn-sm btn-success" @onclick="() => AddContractPayment(overlayContract)">Hinzufügen</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        }
+    </SubTableOverlay>
 }
 
 @code {
@@ -238,7 +233,7 @@ else
     private HashSet<int> editingContractIds = new();
     private Dictionary<int, Contract> editContractCopies = new();
 
-    private HashSet<int> expanded = new();
+    private Contract? overlayContract = null;
     private Dictionary<int, ContractPaymentInput> contractPaymentInputs = new();
     private HashSet<int> editingContractPaymentIds = new();
     private Dictionary<int, ContractPayment> editContractPaymentCopies = new();
@@ -281,14 +276,16 @@ else
         return $"{projectTitle} | PM-{p.Id} | {p.Start.ToShortDateString()} – {p.End.ToShortDateString()} | {p.Amount:C}";
     }
 
-    private void ToggleExpand(int contractId)
+    private void ShowContractOverlay(Contract c)
     {
-        if (!expanded.Remove(contractId))
-        {
-            expanded.Add(contractId);
-            if (!contractPaymentInputs.ContainsKey(contractId))
-                contractPaymentInputs[contractId] = new ContractPaymentInput();
-        }
+        overlayContract = c;
+        if (!contractPaymentInputs.ContainsKey(c.Id))
+            contractPaymentInputs[c.Id] = new ContractPaymentInput();
+    }
+
+    private void CloseContractOverlay()
+    {
+        overlayContract = null;
     }
 
     // --- Contract CRUD ---

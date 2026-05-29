@@ -1,0 +1,60 @@
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (IsVisible)
+{
+    <div class="modal-backdrop show" style="z-index: 1040;"></div>
+    <div class="modal d-block" tabindex="-1" style="z-index: 1050; overflow-y: auto;" @onclick="Close" @ref="modalRef">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" @onclick:stopPropagation>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Title</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @ChildContent
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private ElementReference modalRef;
+    private DotNetObjectReference<SubTableOverlay>? dotNetRef;
+    private bool _wasVisible = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible == _wasVisible) return;
+        _wasVisible = IsVisible;
+        dotNetRef ??= DotNetObjectReference.Create(this);
+        if (IsVisible)
+            await JS.InvokeVoidAsync("subtableOverlay.set", dotNetRef);
+        else
+            await JS.InvokeVoidAsync("subtableOverlay.clear");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (IsVisible)
+            await JS.InvokeVoidAsync("subtableOverlay.focus", modalRef);
+    }
+
+    [JSInvokable]
+    public async Task CloseFromJs() => await OnClose.InvokeAsync();
+
+    private async Task Close() => await OnClose.InvokeAsync();
+
+    public void Dispose()
+    {
+        if (_wasVisible)
+            JS.InvokeVoidAsync("subtableOverlay.clear");
+        dotNetRef?.Dispose();
+    }
+}

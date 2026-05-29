@@ -54,7 +54,7 @@
                         <td>
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge verwalten")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
                         </td>
                     }
                     else
@@ -69,27 +69,10 @@
                         <td>
                             <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
                             <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(e.Id)">@(expanded.Contains(e.Id) ? "Verstecken" : "Arbeitsverträge verwalten")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
                         </td>
                     }
                 </tr>
-
-                @if (expanded.Contains(e.Id))
-                {
-                    <tr>
-                        <td colspan="10" class="p-0 bg-dark-subtle">
-                            <div class="p-3">
-                                <ContractTable 
-                                    contracts="allContracts"
-                                    employees="employees"
-                                    FilterEmployeeId="e.Id"
-                                    ShowAddForm="true"
-                                    Compact="true"
-                                    OnMessageChanged="HandleContractMessage" />
-                            </div>
-                        </td>
-                    </tr>
-                }
             }
         </tbody>
         <tfoot>
@@ -114,6 +97,20 @@
         </tfoot>
     </table>
 
+<SubTableOverlay IsVisible="overlayEmployee != null"
+    Title="@(overlayEmployee != null ? $"Arbeitsverträge: {overlayEmployee.Name}" : "")"
+    OnClose="() => overlayEmployee = null">
+    @if (overlayEmployee != null)
+    {
+        <ContractTable
+            contracts="allContracts"
+            employees="employees"
+            FilterEmployeeId="overlayEmployee.Id"
+            ShowAddForm="true"
+            OnMessageChanged="HandleContractMessage" />
+    }
+</SubTableOverlay>
+
 @code {
     private Employee employee = new()
     {
@@ -125,7 +122,7 @@
     private List<Contract> allContracts = new();
     
     private string message = "";
-    private HashSet<int> expanded = new();
+    private Employee? overlayEmployee = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -213,14 +210,6 @@
             if (disp != null) return disp.Name ?? group.ToString();
         }
         return group.ToString();
-    }
-
-    private void ToggleExpand(int employeeId)
-    {
-        if (!expanded.Remove(employeeId))
-        {
-            expanded.Add(employeeId);
-        }
     }
 
     // --- Inline editing support for Employees ---

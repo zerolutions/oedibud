@@ -45,9 +45,7 @@
                     <td>
                         <button class="btn btn-sm btn-success me-2" @onclick="() => SaveProject(editProjectCopy.Id)">Speichern</button>
                         <button class="btn btn-sm btn-secondary me-2" @onclick="CancelEditProject">Abbrechen</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                            @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel verwalten")
-                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayProject = p">Projektmittel</button>
                     </td>
                 }
                 else
@@ -59,30 +57,10 @@
                     <td>
                         <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditProject(p)">Bearbeiten</button>
                         <button class="btn btn-sm btn-danger me-2" @onclick="() => DeleteProject(p)">Löschen</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleExpand(p.Id)">
-                            @(expanded.Contains(p.Id) ? "Verstecken" : "Projektmittel verwalten")
-                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayProject = p">Projektmittel</button>
                     </td>
                 }
             </tr>
-            @if (expanded.Contains(p.Id))
-            {
-                <tr>
-                    <td colspan="6" class="p-0 bg-dark-subtle">
-                        <div class="p-3">
-                            <PaymentTable
-                                payments="p.Payments"
-                                projects="projects"
-                                contracts="@(new List<Contract>())"
-                                FilterProjectId="p.Id"
-                                ShowContractAssignments="false"
-                                ShowAddForm="true"
-                                Compact="true"
-                                OnMessageChanged="m => { message = m; StateHasChanged(); }" />
-                        </div>
-                    </td>
-                </tr>
-            }
         }
         <tr>
             <td class="fst-italic text-muted">neu</td>
@@ -97,6 +75,22 @@
     </tbody>
 </table>
 
+<SubTableOverlay IsVisible="overlayProject != null"
+    Title="@(overlayProject != null ? $"Projektmittel: {overlayProject.Title}" : "")"
+    OnClose="() => overlayProject = null">
+    @if (overlayProject != null)
+    {
+        <PaymentTable
+            payments="overlayProject.Payments"
+            projects="projects"
+            contracts="@(new List<Contract>())"
+            FilterProjectId="overlayProject.Id"
+            ShowContractAssignments="false"
+            ShowAddForm="true"
+            OnMessageChanged="m => { message = m; StateHasChanged(); }" />
+    }
+</SubTableOverlay>
+
 @code {
     private List<Project> projects = new();
     private Project newProject = new()
@@ -105,7 +99,7 @@
         End = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(36).AddDays(-1)
     };
     private string message = "";
-    private HashSet<int> expanded = new();
+    private Project? overlayProject = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -121,11 +115,6 @@
             .ToListAsync();
     }
 
-    private void ToggleExpand(int projectId)
-    {
-        if (!expanded.Remove(projectId))
-            expanded.Add(projectId);
-    }
 
     private async Task AddProject()
     {
