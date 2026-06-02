@@ -45,17 +45,8 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BudgetDbContext>();
     db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var salaryService =
-//        scope.ServiceProvider.GetRequiredService<TvLSalaryService>();
-
-//    await salaryService.UpdateSalaryTable(DateTime.Now.Year);
-//}
-
-
 
 
 app.Run();

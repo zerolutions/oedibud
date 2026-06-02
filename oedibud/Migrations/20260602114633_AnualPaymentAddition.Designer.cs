@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using oedibud.Data;
 
@@ -10,9 +11,11 @@ using oedibud.Data;
 namespace oedibud.Migrations
 {
     [DbContext(typeof(BudgetDbContext))]
-    partial class BudgetDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260602114633_AnualPaymentAddition")]
+    partial class AnualPaymentAddition
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
@@ -84,13 +87,13 @@ namespace oedibud.Migrations
                     b.Property<int>("ContractId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("ContractShare")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime?>("End")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("PaymentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SharePercent")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("Start")

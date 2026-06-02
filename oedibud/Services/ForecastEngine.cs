@@ -92,9 +92,9 @@ public sealed class ForecastEngine
             foreach (var c in empContracts)
             {
                 var monthlyCostFunc = BuildMonthlyCostFunc(
+                    contract: c,
                     contractStart: c.Start,
                     contractEnd: c.End,
-                    employee: emp,
                     fte: (decimal)c.Fte
                 );
 
@@ -134,12 +134,12 @@ public sealed class ForecastEngine
                         continue;
                     }
 
-                    var remaining = (p.Amount * emp.BruttoFactor);
+                    var remaining = p.Amount * c.EmployerBruttoAddition;
 
                     // greedy month-by-month (exakt wie vorher)
                     for (var m = startMonthCp; m <= endMonthCp && remaining > 0; m = m.AddMonths(1))
                     {
-                        var need = monthlyCostFunc(m) * cp.SharePercent / 100m;
+                        var need = monthlyCostFunc(m) * cp.ContractShare;
                         if (need <= 0) continue;
 
                         var take = Math.Min(need, remaining);
@@ -202,7 +202,7 @@ public sealed class ForecastEngine
                     RootId: emp.Id,
                     Kind: NodeKind.Intermediate,
                     Level: 1,
-                    Label: $"AV-{c.Id} {emp.Group} {c.FtePercent:00}%",
+                    Label: $"AV-{c.Id} {c.Group} {c.FtePercent:00}%",
                     Title: $"Vertrags-ID {c.Id} | {c.Start:MMM yy} - {c.End:MMM yy}",
                     Values: contractCost[c.Id],
                     EmployeeId: emp.Id,
@@ -227,7 +227,7 @@ public sealed class ForecastEngine
                         RootId: emp.Id,
                         Kind: NodeKind.Allocation,
                         Level: 2,
-                        Label: $"<em>{((p.Project?.Title) ?? "")} > </em>{p.Title} {p.DetecatedTo} ({cp.SharePercent * cp.Contract?.Fte:00}%)",
+                        Label: $"<em>{((p.Project?.Title) ?? "")} > </em>{p.Title} {p.DetecatedTo} ({cp.ContractSharePercent * cp.Contract?.Fte:00}%)",
                         Title: $"Projekt-ID {p.ProjectId} | Projektmittel-ID {p.Id} | Gewidmet {p.DetecatedTo} | Projektmittel: {p.Start:MMM yy} - {p.End:MMM yy} | Vertragszuweisung: {cp.Start:MMM yy} - {cp.End:MMM yy} | Betrag {p.Amount:C0}",
                         Values: allocValues,
                         EmployeeId: emp.Id,
@@ -275,9 +275,9 @@ public sealed class ForecastEngine
                     }
 
                     var monthlyCostFunc = BuildMonthlyCostFunc(
+                        contract: contract,
                         contractStart: contract.Start,
                         contractEnd: contract.End,
-                        employee: employee,
                         fte: (decimal)contract.Fte
                     );
 
@@ -290,7 +290,7 @@ public sealed class ForecastEngine
                     {
                         if (m < paymentStart || m > paymentEnd) continue;
 
-                        var need = monthlyCostFunc(m) * cp.SharePercent / 100m;
+                        var need = monthlyCostFunc(m) * cp.ContractShare;
                         assignedByMonth[m] += need;
 
                         if (visibleIndex.TryGetValue(MonthKey(m), out var idx))
@@ -366,7 +366,7 @@ public sealed class ForecastEngine
                 if (!paymentAllocations.TryGetValue(payment.Id, out var allocDict))
                     allocDict = new Dictionary<int, decimal[]>();
 
-                foreach (var cp in payment.ContractPayments.OrderByDescending(x => x.SharePercent))
+                foreach (var cp in payment.ContractPayments.OrderByDescending(x => x.ContractShare))
                 {
                     var cpAlloc = allocDict.TryGetValue(cp.Id, out var cpValues) ? cpValues : new decimal[months];
                     var negAlloc = cpAlloc.Select(v => -v).ToArray(); // wie vorher
@@ -376,7 +376,7 @@ public sealed class ForecastEngine
                         RootId: project.Id,
                         Kind: NodeKind.Allocation,
                         Level: 2,
-                        Label: $"<em>{cp.Contract?.Employee?.Name ?? ""} > </em>AV-{cp.ContractId} {cp.Contract?.Employee?.Group} ({cp.SharePercent * cp.Contract?.Fte:00}%)",
+                        Label: $"<em>{cp.Contract?.Employee?.Name ?? ""} > </em>AV-{cp.ContractId} {cp.Contract?.Group} ({cp.ContractSharePercent * cp.Contract?.Fte:00}%)",
                         Title: $"Vertrag-ID {cp.ContractId} | {cp.Contract?.Start:MMM yy} - {cp.Contract?.End:MMM yy} | Zuweisung {cp.Start:MMM yy} - {cp.End:MMM yy} | Projektmittel-ID {payment.Id}",
                         Values: negAlloc,
                         ProjectId: project.Id,
@@ -412,7 +412,7 @@ public sealed class ForecastEngine
         return cols;
     }
 
-    private Func<DateTime, decimal> BuildMonthlyCostFunc(DateTime contractStart, DateTime contractEnd, Employee employee, decimal fte)
+    private Func<DateTime, decimal> BuildMonthlyCostFunc(Contract contract, DateTime contractStart, DateTime contractEnd, decimal fte)
     {
         var cStart = MonthStart(contractStart);
         var cEnd = MonthStart(contractEnd);
@@ -422,8 +422,8 @@ public sealed class ForecastEngine
             var m = MonthStart(monthStart);
             if (m < cStart || m > cEnd) return 0m;
 
-            int level = employee.GetLevelAt(m);
-            var sal = _tvL.GetSalary(employee.Group, level);
+            int level = contract.GetLevelAt(m);
+            var sal = _tvL.GetSalary(contract.Group, level);
             return sal * fte;
         };
     }

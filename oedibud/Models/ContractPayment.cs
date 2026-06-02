@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace oedibud.Models;
 
@@ -15,7 +16,14 @@ public class ContractPayment
     public Payment? Payment { get; set; }
 
     // Percentage share 0..100
-    public int SharePercent { get; set; }
+    public decimal ContractShare { get; set; }
+
+    [NotMapped]
+    public decimal ContractSharePercent
+    {
+        get => ContractShare * 100m;
+        set => ContractShare = value / 100m;
+    }
 
     // Optional validity range
     public DateTime? Start { get; set; }

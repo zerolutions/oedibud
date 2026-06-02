@@ -22,56 +22,26 @@
                 <th>ID</th>
                 <th>Name</th>
                 <th>Eingestellt am</th>
-                <th>Gruppe</th>
-                <th>Vorerfahrung (M.)</th>
-                <th>Akt. Stufe</th>
-                <th>Nächste Stufe</th>
-                <th>Arbeitgeber Faktor</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var e in employees)
+            @foreach (Employee e in employees)
             {
                 <tr>
                     <td class="fst-italic">@e.Id</td>
-                    @if (editingEmployeeId == e.Id)
-                    {
-                        <td><input class="form-control" @bind="editEmployeeCopies[e.Id].Name" /></td>
-                        <td><input type="date" class="form-control" @bind="editEmployeeCopies[e.Id].HireDate" /></td>
-                        <td>
-                            <select class="form-control" @bind="editEmployeeCopies[e.Id].Group">
-                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                                {
-                                    <option value="@g">@GetGroupName(g)</option>
-                                }
-                            </select>
-                        </td>
-                        <td><input type="number" class="form-control" @bind="editEmployeeCopies[e.Id].ExperienceMonth" /></td>
-                        <td class="fst-italic">@e.Level</td>
-                        <td class="fst-italic">@e.NextLevel.ToShortDateString()</td>
-                        <td><input type="number" class="form-control" @bind="editEmployeeCopies[e.Id].BruttoFactor" /></td>
-                        <td>
+                        <td>@if (editingEmployeeId == e.Id){<input class="form-control" @bind="editEmployeeCopies[e.Id].Name" />}else{@e.Name}</td>
+                        <td>@if (editingEmployeeId == e.Id){<input type="date" class="form-control" @bind="editEmployeeCopies[e.Id].HireDate" />}else{@e.HireDate.ToShortDateString()}</td>
+                        <td>@if (editingEmployeeId != e.Id){
                             <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
-                            <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
+                            <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>}
+                            else
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
+                                <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
+                            }
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
                         </td>
-                    }
-                    else
-                    {
-                        <td>@e.Name</td>
-                        <td>@e.HireDate.ToShortDateString()</td>
-                        <td>@GetGroupName(e.Group)</td>
-                        <td>@e.ExperienceMonth</td>
-                        <td class="fst-italic">@e.Level</td>
-                        <td class="fst-italic">@e.NextLevel.ToShortDateString()</td>
-                        <td>@e.BruttoFactor</td>
-                        <td>
-                            <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
-                            <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
-                        </td>
-                    }
                 </tr>
             }
         </tbody>
@@ -80,18 +50,6 @@
                 <td class="fst-italic text-muted">neu</td>
                 <td><input class="form-control" placeholder="Name" @bind="employee.Name" /></td>
                 <td><input type="date" class="form-control" @bind="employee.HireDate" /></td>
-                <td>
-                    <select class="form-control" @bind="employee.Group">
-                        @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                        {
-                            <option value="@g">@GetGroupName(g)</option>
-                        }
-                    </select>
-                </td>
-                <td><input type="number" class="form-control" @bind="employee.ExperienceMonth" /></td>
-                <td></td>
-                <td></td>
-                <td><input type="number" class="form-control" @bind="employee.BruttoFactor" /></td>
                 <td><button type="button" class="btn btn-sm btn-success" @onclick="Add">Hinzufügen</button></td>
             </tr>
         </tfoot>
@@ -114,8 +72,7 @@
 @code {
     private Employee employee = new()
     {
-        HireDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
-        BruttoFactor = 1.3M
+        HireDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)
     };
 
     private List<Employee> employees = new();
@@ -158,10 +115,7 @@
             var toSave = new Employee
             {
                 Name = employee.Name,
-                Group = employee.Group,
                 HireDate = employee.HireDate,
-                ExperienceMonth = employee.ExperienceMonth,
-                BruttoFactor = employee.BruttoFactor
             };
 
             db.Employees.Add(toSave);
@@ -171,7 +125,7 @@
 
             employees.Insert(0, toSave);
 
-            employee = new Employee { HireDate = DateTime.Today, BruttoFactor = 1.3M };
+            employee = new Employee { HireDate = DateTime.Today};
         }
         catch (Exception ex)
         {
@@ -199,19 +153,6 @@
         }
     }
 
-    private string GetGroupName(EmployeeGroup group)
-    {
-        var mem = typeof(EmployeeGroup).GetMember(group.ToString()).FirstOrDefault();
-        if (mem != null)
-        {
-            var disp = mem.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.DisplayAttribute), false)
-                         .OfType<System.ComponentModel.DataAnnotations.DisplayAttribute>()
-                         .FirstOrDefault();
-            if (disp != null) return disp.Name ?? group.ToString();
-        }
-        return group.ToString();
-    }
-
     // --- Inline editing support for Employees ---
     private int? editingEmployeeId = null;
     private Dictionary<int, Employee> editEmployeeCopies = new();
@@ -223,10 +164,7 @@
         {
             Id = e.Id,
             Name = e.Name,
-            Group = e.Group,
-            HireDate = e.HireDate,
-            ExperienceMonth = e.ExperienceMonth,
-            BruttoFactor = e.BruttoFactor
+            HireDate = e.HireDate
         };
     }
 
@@ -240,20 +178,14 @@
             if (dbItem != null)
             {
                 dbItem.Name = copy.Name;
-                dbItem.Group = copy.Group;
                 dbItem.HireDate = copy.HireDate;
-                dbItem.ExperienceMonth = copy.ExperienceMonth;
-                dbItem.BruttoFactor = copy.BruttoFactor;
                 await db.SaveChangesAsync();
 
                 var idx = employees.FindIndex(x => x.Id == id);
                 if (idx >= 0)
                 {
                     employees[idx].Name = dbItem.Name;
-                    employees[idx].Group = dbItem.Group;
                     employees[idx].HireDate = dbItem.HireDate;
-                    employees[idx].ExperienceMonth = dbItem.ExperienceMonth;
-                    employees[idx].BruttoFactor = dbItem.BruttoFactor;
                 }
                 message = "Mitarbeiter gespeichert.";
             }

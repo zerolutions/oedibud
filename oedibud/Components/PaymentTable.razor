@@ -158,7 +158,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var cp in (overlayPayment.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.SharePercent))
+                    @foreach (var cp in (overlayPayment.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.ContractShare))
                     {
                         <tr>
                             @if (editingContractAssignIds.Contains(cp.Id))
@@ -174,11 +174,11 @@ else
                                 </td>
                                 <td>
                                     <div class="input-group">
-                                        <input type="number" class="form-control" step="1" min="0" max="100" @bind="editContractAssignCopies[cp.Id].SharePercent" />
+                                        <input type="number" class="form-control" step="1" min="0" max="100" @bind="editContractAssignCopies[cp.Id].ContractSharePercent" />
                                         <span class="input-group-text">%</span>
                                     </div>
                                 </td>
-                                <td>@(editContractAssignCopies[cp.Id].SharePercent * (contracts.FirstOrDefault(c => c.Id == editContractAssignCopies[cp.Id].ContractId)?.Fte ?? 0))%</td>
+                                <td>@(editContractAssignCopies[cp.Id].ContractSharePercent * (contracts.FirstOrDefault(c => c.Id == editContractAssignCopies[cp.Id].ContractId)?.Fte ?? 0))%</td>
                                 <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].Start" /></td>
                                 <td><input type="date" class="form-control" @bind="editContractAssignCopies[cp.Id].End" /></td>
                                 <td>
@@ -190,8 +190,8 @@ else
                             {
                                 <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
                                 <td>AV-@cp.ContractId</td>
-                                <td>@cp.SharePercent%</td>
-                                <td>@(cp.SharePercent * (cp.Contract?.Fte ?? 0))%</td>
+                                <td>@cp.ContractSharePercent%</td>
+                                <td>@(cp.ContractSharePercent * (cp.Contract?.Fte ?? 0))%</td>
                                 <td>@(cp.Start?.ToShortDateString() ?? "-")</td>
                                 <td>@(cp.End?.ToShortDateString() ?? "-")</td>
                                 <td>
@@ -213,7 +213,7 @@ else
                         </td>
                         <td>
                             <div class="input-group">
-                                <input type="number" class="form-control" step="1" min="0" max="100" @bind="GetOrAddContractAssignInput(overlayPayment.Id).SharePercent" />
+                                <input type="number" class="form-control" step="1" min="0" max="100" @bind="GetOrAddContractAssignInput(overlayPayment.Id).ContractShare" />
                                 <span class="input-group-text">%</span>
                             </div>
                         </td>
@@ -253,7 +253,7 @@ else
     private class ContractAssignInput
     {
         public int ContractId { get; set; }
-        public int SharePercent { get; set; } = 100;
+        public int ContractShare { get; set; } = 100;
         public DateTime? Start { get; set; }
         public DateTime? End { get; set; }
     }
@@ -293,10 +293,10 @@ else
 
     private IEnumerable<Contract> AvailableContractsForPayment(Payment p)
     {
-        var paymentGroup = p.DetecatedTo;
+        EmployeeGroup? paymentGroup = p.DetecatedTo;
         var assignedIds = p.ContractPayments?.Select(x => x.ContractId).ToHashSet() ?? new HashSet<int>();
-        return contracts.Where(c => !assignedIds.Contains(c.Id) &&
-            (paymentGroup == null || (c.Employee != null && c.Employee.Group == paymentGroup)));
+        return contracts.Where(c => !assignedIds.Contains(c.Id) && (paymentGroup == null || (c.Employee != null && c.Group == paymentGroup))
+            );
     }
 
     private string GetContractLabel(int contractId)
@@ -483,7 +483,7 @@ else
             Id = cp.Id,
             ContractId = cp.ContractId,
             PaymentId = cp.PaymentId,
-            SharePercent = cp.SharePercent,
+            ContractShare = cp.ContractShare,
             Start = cp.Start,
             End = cp.End
         };
@@ -504,7 +504,7 @@ else
             var dbItem = await db.ContractPayments.FindAsync(id);
             if (dbItem != null)
             {
-                dbItem.SharePercent = copy.SharePercent;
+                dbItem.ContractShare = copy.ContractShare;
                 dbItem.Start = copy.Start;
                 dbItem.End = copy.End;
                 dbItem.ContractId = copy.ContractId;
@@ -513,7 +513,7 @@ else
                 var idx = p.ContractPayments?.FindIndex(x => x.Id == id) ?? -1;
                 if (idx >= 0)
                 {
-                    p.ContractPayments[idx].SharePercent = dbItem.SharePercent;
+                    p.ContractPayments[idx].ContractShare = dbItem.ContractShare;
                     p.ContractPayments[idx].Start = dbItem.Start;
                     p.ContractPayments[idx].End = dbItem.End;
                     p.ContractPayments[idx].ContractId = dbItem.ContractId;
@@ -544,7 +544,7 @@ else
             await OnMessageChanged.InvokeAsync("Bitte einen Vertrag auswählen.");
             return;
         }
-        if (input.SharePercent < 0 || input.SharePercent > 100)
+        if (input.ContractShare < 0 || input.ContractShare > 100)
         {
             await OnMessageChanged.InvokeAsync("Lohnanteil muss zwischen 0 und 100 liegen.");
             return;
@@ -556,7 +556,7 @@ else
             {
                 PaymentId = p.Id,
                 ContractId = input.ContractId,
-                SharePercent = input.SharePercent,
+                ContractShare = input.ContractShare,
                 Start = input.Start,
                 End = input.End
             };
