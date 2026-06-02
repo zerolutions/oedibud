@@ -412,7 +412,11 @@ public sealed class ForecastEngine
         return cols;
     }
 
-    private Func<DateTime, decimal> BuildMonthlyCostFunc(Contract contract, DateTime contractStart, DateTime contractEnd, decimal fte)
+   private Func<DateTime, decimal> BuildMonthlyCostFunc(
+    Contract contract,
+    DateTime contractStart,
+    DateTime contractEnd,
+    decimal fte)
     {
         var cStart = MonthStart(contractStart);
         var cEnd = MonthStart(contractEnd);
@@ -423,7 +427,69 @@ public sealed class ForecastEngine
             if (m < cStart || m > cEnd) return 0m;
 
             int level = contract.GetLevelAt(m);
-            var sal = _tvL.GetSalary(contract.Group, level);
+            var baseSalary = _tvL.GetSalary(contract.Group, level);
+            var sal = baseSalary * (1 + contract.EmployerBruttoAddition);
+
+            // Jahressonderzahlung im November
+            if (m.Month == 11)
+            {
+                var year = m.Year;
+                var dec1 = new DateTime(year, 12, 1);
+
+                // Anspruch nur wenn am 01.12. im Vertrag
+                if (contractStart <= dec1 && contractEnd >= dec1)
+                {
+                    decimal jszFactor = contract.AnualPaymentAddition;
+
+                    decimal referenceSalary;
+
+                    // Sonderfall: Start nach 31.08.
+                    if (contractStart > new DateTime(year, 8, 31))
+                    {
+                        var firstFullMonth = MonthStart(contractStart.AddMonths(1));
+                        int lvl = contract.GetLevelAt(firstFullMonth);
+                        referenceSalary = _tvL.GetSalary(contract.Group, lvl);
+                    }
+                    else
+                    {
+                        // Durchschnitt Juli–September
+                        decimal sum = 0m;
+                        int count = 0;
+
+                        for (int month = 7; month <= 9; month++)
+                        {
+                            var refDate = new DateTime(year, month, 1);
+                            if (refDate >= cStart && refDate <= cEnd)
+                            {
+                                int lvl = contract.GetLevelAt(refDate);
+                                sum += _tvL.GetSalary(contract.Group, lvl);
+                                count++;
+                            }
+                        }
+
+                        referenceSalary = count > 0 ? sum / count : baseSalary;
+                    }
+
+                    // Kürzung: 1/12 pro fehlendem Monat
+                    int employedMonths = 0;
+                    for (int month = 1; month <= 12; month++)
+                    {
+                        var check = new DateTime(year, month, 1);
+                        if (check >= cStart && check <= cEnd)
+                            employedMonths++;
+                    }
+
+                    decimal reductionFactor = employedMonths / 12m;
+
+                    var jsz = referenceSalary * jszFactor * reductionFactor;
+
+                    // Arbeitgeberanteil berücksichtigen
+                    jsz *= (1 + contract.EmployerBruttoAddition);
+
+                    sal += jsz;
+                }
+            }
+
             return sal * fte;
         };
     }

@@ -58,7 +58,7 @@ else
                     <td>@if(!editingContractIds.Contains(c.Id)){ @c.Start.ToShortDateString() }else{ <input type="date" class="form-control" @bind="editContractCopies[c.Id].Start" />} </td>
                     <td>@if(!editingContractIds.Contains(c.Id)){ @c.End.ToShortDateString() }else{ <input type="date" class="form-control" @bind="editContractCopies[c.Id].End" />} </td>
                     <td>@if(!editingContractIds.Contains(c.Id)){ @c.FtePercent }else{ <input type="number" step="1" min="0" max="100" class="form-control" @bind="editContractCopies[c.Id].FtePercent" />}  </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.Group }else{ <select class="form-control" @bind="editContractCopies[c.Id].Group">
+                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.Group }else{ <select class="form-control"  @bind="editContractCopies[c.Id].Group">
                                 @foreach (var g in Enum.GetValues<EmployeeGroup>())
                                 {
                                     <option value="@g">@GetGroupName(g)</option>
@@ -267,7 +267,7 @@ else
         Group  = EmployeeGroup.E13,
         Level = 1,
         EmployerBruttoAddition = 0.3m,
-        AnualPaymentAddition = 46.47m,
+        AnualPaymentAddition = 0.4647m,
         ExperienceMonth = 0
     };
     private HashSet<int> editingContractIds = new();
