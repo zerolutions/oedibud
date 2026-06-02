@@ -26,29 +26,23 @@ public class Contract
         get => Fte * 100;
         set => Fte = value / 100;
     }
+    [NotMapped]
+    public decimal EmployerBruttoAdditionPercent
+    {
+        get => EmployerBruttoAddition * 100;
+        set => EmployerBruttoAddition = value / 100;
+    }
+    [NotMapped]
+    public decimal AnualPaymentAdditionPercent
+    {
+        get => AnualPaymentAddition * 100;
+        set => AnualPaymentAddition = value / 100;
+    }
 
     // Navigation: payments assigned to this contract (many-to-many via ContractPayment)
     public List<ContractPayment> ContractPayments { get; set; } = new();
 
     public int Level {get; set;}
-    // public int Level
-    // {
-    //     get
-    //     {
-    //         var today = DateTime.Today;
-    //         int monthsSinceHire = (today.Year - HireDate.Year) * 12 + (today.Month - HireDate.Month) + ExperienceMonth;
-
-    //         // find highest level whose threshold is <= monthsSinceHire
-    //         for (int lvl = LevelThresholds.Length; lvl >= 1; lvl--)
-    //         {
-    //             int threshold = LevelThresholds[Math.Max(0, lvl - 1)];
-    //             if (monthsSinceHire >= threshold) return Math.Min(lvl, LevelThresholds.Length);
-    //         }
-    //         return 1;
-    //     }
-    // }
-
-    // navigation: (PaymentAssignment removed - direct employee assignments are not supported)
 
     public DateTime NextLevel
     {
