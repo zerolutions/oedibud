@@ -9,7 +9,7 @@ public class Contract
 {
     public int Id { get; set; }
 
-    private static readonly int[] LevelThresholds = { 0, 12, 36, 72, 120, 180 }; // month thresholds for levels 1..6
+    private static readonly int[] LevelThresholds = { 0, 12, 24, 36, 48, 60 }; // month thresholds for levels 1..6
     [NotMapped]
     private EmployeeGroup group = EmployeeGroup.E13;
 
@@ -80,11 +80,11 @@ public class Contract
 
             int nextThreshold = LevelThresholds[current]; // next level threshold in months
             // months from HireDate to reach next threshold, accounting for prior experience
-            int monthsToNextFromHire = nextThreshold - ExperienceMonth;
-            if (monthsToNextFromHire <= 0) // already reached by prior experience
+            int monthsToNextFromContract = nextThreshold - ExperienceMonth;
+            if (monthsToNextFromContract <= 0) // already reached by prior experience
                 return Start; // next level is effective immediately at contract start
 
-            var olddate = Start.AddMonths(monthsToNextFromHire);
+            var olddate = Start.AddMonths(monthsToNextFromContract);
 
             return new DateTime(olddate.Year, olddate.Month, 1,  0, 0, 0, olddate.Kind); ;
         }
