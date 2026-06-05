@@ -1,0 +1,27 @@
+@typeparam T
+
+@if (!IsEditing)
+{
+    @(DisplayText ?? Value?.ToString())
+}
+else
+{
+    <input type="number"
+           class="form-control"
+           step="@Step"
+           min="@Min"
+           max="@Max"
+           @bind:get="Value" @bind:set="async v => await ValueChanged.InvokeAsync(v)" />
+}
+
+@code {
+    [Parameter] public T Value { get; set; } = default!;
+    [Parameter] public EventCallback<T> ValueChanged { get; set; }
+
+    [Parameter] public bool IsEditing { get; set; }
+
+    [Parameter] public string Step { get; set; } = "1";
+    [Parameter] public string? Min { get; set; }
+    [Parameter] public string? Max { get; set; }
+    [Parameter] public string? DisplayText { get; set; }
+}

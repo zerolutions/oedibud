@@ -1,0 +1,17 @@
+@if (!IsEditing)
+{
+    @($"{Value:0.##}%")
+}
+else
+{
+    <div class="input-group">
+        <input type="number" class="form-control" step="@Step" min="0" max="100" @bind:get="Value" @bind:set="async v => await ValueChanged.InvokeAsync(v)" />
+        <span class="input-group-text">%</span></div>
+}
+
+@code {
+    [Parameter] public decimal Value { get; set; }
+    [Parameter] public EventCallback<decimal> ValueChanged { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public decimal Step { get; set; } = 0.01m;
+}

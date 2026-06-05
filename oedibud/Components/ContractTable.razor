@@ -2,6 +2,7 @@
 @using System.Linq
 @using oedibud.Models
 @using oedibud.Data
+@using oedibud.Components.Editable
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 
 @{
@@ -39,113 +40,67 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (Contract c in displayContracts)
-            {
-                <tr>
-                    <td>@c.Id</td>
-                    @if (!FilterEmployeeId.HasValue)
-                    {
-                        <td>@if(!editingContractIds.Contains(c.Id)){ @(employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name) } else {
-                             <select class="form-control" @bind="editContractCopies[c.Id].EmployeeId">
-                                @foreach (var e in employees)
-                                {
-                                    <option value="@e.Id">@e.Name</option>
-                                }
-                            </select> 
-                            }
-                        </td>
-                    }
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.Start.ToShortDateString() }else{ <input type="date" class="form-control" @bind="editContractCopies[c.Id].Start" />} </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.End.ToShortDateString() }else{ <input type="date" class="form-control" @bind="editContractCopies[c.Id].End" />} </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.FtePercent }else{ <input type="number" step="1" min="0" max="100" class="form-control" @bind="editContractCopies[c.Id].FtePercent" />}  </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.Group }else{ <select class="form-control"  @bind="editContractCopies[c.Id].Group">
-                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                                {
-                                    <option value="@g">@GetGroupName(g)</option>
-                                }
-                            </select>}  </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.Level }else{ <input type="number" step="1" min="1" max="6" class="form-control" @bind="editContractCopies[c.Id].Level" />}  </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @c.ExperienceMonth }else{ <input type="number" step="1" min="1" class="form-control" @bind="editContractCopies[c.Id].ExperienceMonth" />}  </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @(c.EmployerBruttoAdditionPercent + "%") }else{
-                        <div class="input-group">
-                            <input type="number" class="form-control" step="1" min="0" max="100" @bind="editContractCopies[c.Id].EmployerBruttoAdditionPercent" />
-                            <span class="input-group-text">%</span>
-                        </div>} 
-                    </td>
-                    <td>@if(!editingContractIds.Contains(c.Id)){ @(c.AnualPaymentAdditionPercent + "%") }else{ 
-                        <div class="input-group">
-                            <input type="number" class="form-control" step="1" min="0" max="100"  @bind="editContractCopies[c.Id].AnualPaymentAdditionPercent" />
-                            <span class="input-group-text">%</span>
-                        </div>}  
-                    </td>
-                    <td class="fst-italic">@c.NextLevel.ToShortDateString()</td>
-                    <td>
-                        @if (editingContractIds.Contains(c.Id))
-                        {
-                            <button class="btn btn-sm btn-success me-2" @onclick="() => SaveContract(c.Id)">Speichern</button>
-                            <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
+        @foreach (Contract c in displayContracts)
+        {
+            var isEditing = editingContractIds.Contains(c.Id);
+            var edit = isEditing ? editContractCopies[c.Id] : c;
 
-                        }
-                        else
-                        {
-                            <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditContract(c)">Bearbeiten</button>
-                            <button class="btn btn-danger btn-sm me-2" @onclick="@(a => DeleteContract(c.Id))">Löschen</button>
+            <tr>
+                <td>@c.Id</td>
 
-                        }
-                        @if (ShowContractPayments)
-                        {
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowContractOverlay(c)">Projektmittel</button>
-                        }
-                    </td>
-                </tr>
-            }
-            @if (ShowAddForm)
-            {
-                <tr>
-                    <td class="fst-italic text-muted">neu</td>
-                    @if (!FilterEmployeeId.HasValue)
+                @if (!FilterEmployeeId.HasValue)
+                {
+                    <td><EditableSelect @bind-Value="edit.EmployeeId" IsEditing="isEditing" DisplayText="@employees.FirstOrDefault(e => e.Id == c.EmployeeId)?.Name" Items="@employees.Select(e => new EditableSelect<int>.SelectItem{ Value = e.Id, Text = e.Name })" /></td>
+                }
+
+                <td><EditableDate @bind-Value="edit.Start" IsEditing="isEditing" /></td>
+                <td><EditableDate @bind-Value="edit.End" IsEditing="isEditing" /></td>
+                <td><EditablePercent @bind-Value="edit.FtePercent" IsEditing="isEditing" /></td>
+                <td><EditableSelect @bind-Value="edit.Group" IsEditing="isEditing" DisplayText="@c.Group.ToString()" Items="Enum.GetValues<EmployeeGroup>().Select(g => new EditableSelect<EmployeeGroup>.SelectItem{ Value = g, Text = GetGroupName(g) })" /></td>
+                <td><EditableNumber @bind-Value="edit.Level" IsEditing="isEditing" Min="1" Max="6" /></td>
+                <td><EditableNumber @bind-Value="edit.ExperienceMonth" IsEditing="isEditing" Min="0" /></td>
+                <td><EditablePercent @bind-Value="edit.EmployerBruttoAdditionPercent" IsEditing="isEditing" /></td>
+                <td><EditablePercent @bind-Value="edit.AnualPaymentAdditionPercent" IsEditing="isEditing" /></td>
+                <td class="fst-italic">@c.NextLevel.ToShortDateString()</td>
+                <td>
+                    @if (isEditing)
                     {
-                        <td>
-                            <select class="form-control" @bind="newContractInput.EmployeeId">
-                                <option value="0">-- auswählen --</option>
-                                @foreach (var e in employees)
-                                {
-                                    <option value="@e.Id">@e.Name</option>
-                                }
-                            </select>
-                        </td>
+                        <button class="btn btn-sm btn-success me-2" @onclick="() => SaveContract(c.Id)">Speichern</button>
+                        <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditContract(c.Id)">Abbrechen</button>
                     }
-                    <td><input type="date" class="form-control" @bind="newContractInput.Start" /></td>
-                    <td><input type="date" class="form-control" @bind="newContractInput.End" /></td>
-                    <td><input type="number" step="1" min="0" max="100" class="form-control" @bind="newContractInput.FtePercent" /></td>
-                    <td>
-                        <select class="form-control" @bind="newContractInput.Group">
-                            @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                            {
-                                <option value="@g">@GetGroupName(g)</option>
-                            }
-                        </select>
-                    </td>
-                    <td><input type="number" step="1" min="1" max="6" class="form-control" @bind="newContractInput.Level" /></td>
-                    <td><input type="number" step="1" min="0" class="form-control" @bind="newContractInput.ExperienceMonth" /></td>
-                    <td>
-                        <div class="input-group">
-                            <input type="number" class="form-control" step="1" min="0" max="100" @bind="newContractInput.EmployerBruttoAdditionPercent" />
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="input-group">
-                            <input type="number" class="form-control" step="1" min="0" max="100" @bind="newContractInput.AnualPaymentAdditionPercent" />
-                            <span class="input-group-text">%</span>
-                        </div>
-                    </td>
-                    <td></td>
-                    <td>
-                        <button class="btn btn-success btn-sm" @onclick="AddContract">Hinzufügen</button>
-                    </td>
-                </tr>
-            }
+                    else
+                    {
+                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditContract(c)">Bearbeiten</button>
+                        <button class="btn btn-danger btn-sm me-2" @onclick="@(a => DeleteContract(c.Id))">Löschen</button>
+                    }
+                </td>
+            </tr>
+        }
+
+        @if (ShowAddForm)
+        {
+            <tr>
+                <td class="fst-italic text-muted">neu</td>
+
+                @if (!FilterEmployeeId.HasValue)
+                {
+                    <td><EditableSelect @bind-Value="newContractInput.EmployeeId" IsEditing="true" Items="employees.Select(e => new EditableSelect<int>.SelectItem{ Value = e.Id, Text = e.Name })" /></td>
+                }
+
+                <td><EditableDate @bind-Value="newContractInput.Start" IsEditing="true" /></td>
+                <td><EditableDate @bind-Value="newContractInput.End" IsEditing="true" /></td>
+                <td><EditablePercent @bind-Value="newContractInput.FtePercent" IsEditing="true" /></td>
+                <td><EditableSelect @bind-Value="newContractInput.Group" IsEditing="true" Items="Enum.GetValues<EmployeeGroup>().Select(g => new EditableSelect<EmployeeGroup>.SelectItem{ Value = g, Text = GetGroupName(g) })" /></td>
+                <td><EditableNumber @bind-Value="newContractInput.Level" IsEditing="true" Min="1" Max="6" /></td>
+                <td><EditableNumber @bind-Value="newContractInput.ExperienceMonth" IsEditing="true" Min="0" /></td>
+                <td><EditablePercent @bind-Value="newContractInput.EmployerBruttoAdditionPercent" IsEditing="true" /></td>
+                <td><EditablePercent @bind-Value="newContractInput.AnualPaymentAdditionPercent" IsEditing="true" /></td>
+
+                <td></td>
+
+                <td><button class="btn btn-success btn-sm" @onclick="AddContract">Hinzufügen</button></td>
+            </tr>
+        }
         </tbody>
     </table>
 
@@ -259,17 +214,24 @@ else
     [Parameter] public EventCallback<Contract> OnContractUpdated { get; set; }
     [Parameter] public EventCallback<string> OnMessageChanged { get; set; }
 
-    private Contract newContractInput = new Contract()
+    private Contract newContractInput = GetDefaultContractInput();
+
+    private static Contract GetDefaultContractInput(int employeeId = 0)
     {
-        Start  = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
-        End = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1),
-        FtePercent = 100m,
-        Group  = EmployeeGroup.E13,
-        Level = 1,
-        EmployerBruttoAddition = 0.3m,
-        AnualPaymentAddition = 0.4647m,
-        ExperienceMonth = 0
-    };
+        return new Contract()
+        {
+            EmployeeId = employeeId,
+            Start  = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+            End = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(24).AddDays(-1),
+            FtePercent = 100m,
+            Group  = EmployeeGroup.E13,
+            Level = 1,
+            EmployerBruttoAddition = 0.2800m,
+            AnualPaymentAddition = 0.4647m,
+            ExperienceMonth = 0
+        };
+    }
+
     private HashSet<int> editingContractIds = new();
     private Dictionary<int, Contract> editContractCopies = new();
 
@@ -437,7 +399,7 @@ else
                 await OnContractAdded.InvokeAsync(saved);
             }
             await OnMessageChanged.InvokeAsync("Vertrag gespeichert.");
-            newContractInput = new Contract { EmployeeId = FilterEmployeeId ?? 0};
+            newContractInput = GetDefaultContractInput(FilterEmployeeId ?? 0);
         }
         catch (Exception ex)
         {
@@ -506,12 +468,12 @@ else
                 var idx = c.ContractPayments?.FindIndex(x => x.Id == id) ?? -1;
                 if (idx >= 0)
                 {
-                    c.ContractPayments[idx].ContractShare = dbItem.ContractShare;
-                    c.ContractPayments[idx].Start = dbItem.Start;
-                    c.ContractPayments[idx].End = dbItem.End;
-                    c.ContractPayments[idx].PaymentId = dbItem.PaymentId;
-                    var loaded = await db.ContractPayments.Include(x => x.Payment).ThenInclude(p => p.Project).FirstOrDefaultAsync(x => x.Id == id);
-                    if (loaded != null) c.ContractPayments[idx].Payment = loaded.Payment;
+                    c.ContractPayments![idx].ContractShare = dbItem.ContractShare;
+                    c.ContractPayments![idx].Start = dbItem.Start;
+                    c.ContractPayments![idx].End = dbItem.End;
+                    c.ContractPayments![idx].PaymentId = dbItem.PaymentId;
+                    var loaded = await db.ContractPayments.Include(x => x.Payment).ThenInclude(p => p!.Project).FirstOrDefaultAsync(x => x.Id == id);
+                    if (loaded != null) c.ContractPayments![idx].Payment = loaded.Payment;
                 }
                 await OnMessageChanged.InvokeAsync("Projektmittel-Zuweisung gespeichert.");
             }
@@ -555,7 +517,7 @@ else
 
             var loaded = await db.ContractPayments
                 .Include(x => x.Payment)
-                    .ThenInclude(p => p.Project)
+                    .ThenInclude(p => p!.Project)
                 .FirstOrDefaultAsync(x => x.Id == cp.Id);
 
             if (loaded != null)

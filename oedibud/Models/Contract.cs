@@ -30,19 +30,19 @@ public class Contract
     [NotMapped]
     public decimal FtePercent
     {
-        get => Fte * 100;
+        get => decimal.Floor(Fte * 10000) / 100; // round down to 2 decimals
         set => Fte = value / 100;
     }
     [NotMapped]
     public decimal EmployerBruttoAdditionPercent
     {
-        get => EmployerBruttoAddition * 100;
+        get => decimal.Floor(EmployerBruttoAddition * 10000) / 100; // round down to 2 decimals
         set => EmployerBruttoAddition = value / 100;
     }
     [NotMapped]
     public decimal AnualPaymentAdditionPercent
     {
-        get => AnualPaymentAddition * 100;
+        get => decimal.Floor(AnualPaymentAddition * 10000) / 100; // round down to 2 decimals
         set => AnualPaymentAddition = value / 100;
     }
 

@@ -26,7 +26,8 @@ public class TvLSalaryService
 
         var latest = resourceNames.First();
 
-        using var stream = assembly.GetManifestResourceStream(latest);
+        using var stream = assembly.GetManifestResourceStream(latest)
+            ?? throw new InvalidOperationException($"Resource '{latest}' not found.");
         using var reader = new StreamReader(stream);
 
         // Header überspringen

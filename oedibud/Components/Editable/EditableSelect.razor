@@ -1,0 +1,24 @@
+@if (!IsEditing)
+{
+    @DisplayText
+}
+else
+{
+    <select class="form-control" @bind:get="Value" @bind:set="async v => await ValueChanged.InvokeAsync(v)">@foreach (var item in Items){<option value="@item.Value">@item.Text</option>}</select>
+}
+
+@typeparam T
+
+@code {
+    public class SelectItem
+    {
+        public T Value { get; set; } = default!;
+        public string Text { get; set; } = "";
+    }
+
+    [Parameter] public T Value { get; set; } = default!;
+    [Parameter] public EventCallback<T> ValueChanged { get; set; }
+    [Parameter] public IEnumerable<SelectItem> Items { get; set; } = Enumerable.Empty<SelectItem>();
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public string? DisplayText { get; set; }
+}

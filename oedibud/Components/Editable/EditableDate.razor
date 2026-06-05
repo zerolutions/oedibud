@@ -1,0 +1,14 @@
+@if (!IsEditing)
+{
+    @Value.ToShortDateString()
+}
+else
+{
+    <input type="date" class="form-control" @bind:get="Value" @bind:set="async v => await ValueChanged.InvokeAsync(v)" />
+}
+
+@code {
+    [Parameter] public DateTime Value { get; set; }
+    [Parameter] public EventCallback<DateTime> ValueChanged { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+}

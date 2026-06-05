@@ -2,6 +2,7 @@
 @using System.Linq
 @using oedibud.Models
 @using oedibud.Data
+@using oedibud.Components.Editable
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 @inject oedibud.Services.DataChangeNotifier Notifier
 
@@ -41,64 +42,60 @@ else
         <tbody>
             @foreach (var p in displayPayments)
             {
+                var isEditing = editingPaymentIds.Contains(p.Id);
+                var edit = isEditing ? editPaymentCopies[p.Id] : p;
+
                 <tr>
-                    @if (editingPaymentIds.Contains(p.Id))
+                    @if (showProjectCol)
                     {
-                        @if (showProjectCol)
-                        {
-                            <td class="fst-italic">@p.Id</td>
-                            <td>
-                                <select class="form-control" @bind="editPaymentCopies[p.Id].ProjectId">
-                                    @foreach (var pr in projects)
-                                    {
-                                        <option value="@pr.Id">@pr.Title</option>
-                                    }
-                                </select>
-                            </td>
-                        }
-                        <td><input type="text" class="form-control" @bind="editPaymentCopies[p.Id].Title" /></td>
-                        <td><input type="date" class="form-control" @bind="editPaymentCopies[p.Id].Start" /></td>
-                        <td><input type="date" class="form-control" @bind="editPaymentCopies[p.Id].End" /></td>
-                        <td><input type="number" step="1" class="form-control" @bind="editPaymentCopies[p.Id].Amount" /></td>
+                        <td class="fst-italic">@p.Id</td>
                         <td>
-                            <select class="form-control" @bind="editPaymentCopies[p.Id].DetecatedTo">
+                            <EditableSelect @bind-Value="edit.ProjectId"
+                                IsEditing="isEditing"
+                                DisplayText="@(p.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == p.ProjectId)?.Title ?? "-")"
+                                Items="projects.Select(pr => new EditableSelect<int>.SelectItem{ Value = pr.Id, Text = pr.Title })" />
+                        </td>
+                    }
+                    <td><EditableText @bind-Value="edit.Title" IsEditing="isEditing" /></td>
+                    <td><EditableDate @bind-Value="edit.Start" IsEditing="isEditing" /></td>
+                    <td><EditableDate @bind-Value="edit.End" IsEditing="isEditing" /></td>
+                    <td><EditableNumber @bind-Value="edit.Amount" IsEditing="isEditing" Step="1" DisplayText="@(isEditing ? null : p.Amount.ToString("C"))" /></td>
+                    <td>
+                        @if (isEditing)
+                        {
+                            <select class="form-control" @bind="edit.DetecatedTo">
                                 <option value="">-- keine Angabe --</option>
                                 @foreach (var g in Enum.GetValues<EmployeeGroup>())
                                 {
                                     <option value="@g">@g</option>
                                 }
                             </select>
-                        </td>
-                        <td>
+                        }
+                        else
+                        {
+                            @(p.DetecatedTo?.ToString() ?? "-")
+                        }
+                    </td>
+                    <td>
+                        @if (isEditing)
+                        {
                             <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(p.Id)">Speichern</button>
                             <button class="btn btn-sm btn-secondary me-1" @onclick="() => CancelEditPayment(p.Id)">Abbrechen</button>
                             @if (ShowContractAssignments)
                             {
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowPaymentOverlay(p)">Verträge zuweisen</button>
                             }
-                        </td>
-                    }
-                    else
-                    {
-                        @if (showProjectCol)
-                        {
-                            <td class="fst-italic">@p.Id</td>
-                            <td>@(p.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == p.ProjectId)?.Title ?? "-")</td>
                         }
-                        <td>@(p.Title ?? "-")</td>
-                        <td>@p.Start.ToShortDateString()</td>
-                        <td>@p.End.ToShortDateString()</td>
-                        <td>@p.Amount.ToString("C")</td>
-                        <td>@(p.DetecatedTo?.ToString() ?? "-")</td>
-                        <td>
+                        else
+                        {
                             <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(p)">Bearbeiten</button>
                             <button class="btn btn-sm btn-danger me-1" @onclick="() => DeletePayment(p)">Löschen</button>
                             @if (ShowContractAssignments)
                             {
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowPaymentOverlay(p)">Verträge zuweisen</button>
                             }
-                        </td>
-                    }
+                        }
+                    </td>
                 </tr>
             }
             @if (ShowAddForm)
@@ -117,10 +114,10 @@ else
                             </select>
                         </td>
                     }
-                    <td><input type="text" class="form-control" placeholder="Titel" @bind="newPaymentInput.Title" /></td>
-                    <td><input type="date" class="form-control" @bind="newPaymentInput.Start" /></td>
-                    <td><input type="date" class="form-control" @bind="newPaymentInput.End" /></td>
-                    <td><input type="number" step="1" class="form-control" @bind="newPaymentInput.Amount" /></td>
+                    <td><EditableText @bind-Value="newPaymentInput.Title" IsEditing="true" /></td>
+                    <td><EditableDate @bind-Value="newPaymentInput.Start" IsEditing="true" /></td>
+                    <td><EditableDate @bind-Value="newPaymentInput.End" IsEditing="true" /></td>
+                    <td><EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="true" Step="1" /></td>
                     <td>
                         <select class="form-control" @bind="newPaymentInput.DetecatedTo">
                             <option value="">-- keine Angabe --</option>
@@ -513,14 +510,14 @@ else
                 var idx = p.ContractPayments?.FindIndex(x => x.Id == id) ?? -1;
                 if (idx >= 0)
                 {
-                    p.ContractPayments[idx].ContractShare = dbItem.ContractShare;
-                    p.ContractPayments[idx].Start = dbItem.Start;
-                    p.ContractPayments[idx].End = dbItem.End;
-                    p.ContractPayments[idx].ContractId = dbItem.ContractId;
+                    p.ContractPayments![idx].ContractShare = dbItem.ContractShare;
+                    p.ContractPayments![idx].Start = dbItem.Start;
+                    p.ContractPayments![idx].End = dbItem.End;
+                    p.ContractPayments![idx].ContractId = dbItem.ContractId;
                     var loaded = await db.ContractPayments
-                        .Include(x => x.Contract).ThenInclude(c => c.Employee)
+                        .Include(x => x.Contract).ThenInclude(c => c!.Employee)
                         .FirstOrDefaultAsync(x => x.Id == id);
-                    if (loaded != null) p.ContractPayments[idx].Contract = loaded.Contract;
+                    if (loaded != null) p.ContractPayments![idx].Contract = loaded.Contract;
                 }
                 Notifier.Notify();
                 await OnMessageChanged.InvokeAsync("Zuweisung gespeichert.");
@@ -564,7 +561,7 @@ else
             await db.SaveChangesAsync();
 
             var loaded = await db.ContractPayments
-                .Include(x => x.Contract).ThenInclude(c => c.Employee)
+                .Include(x => x.Contract).ThenInclude(c => c!.Employee)
                 .FirstOrDefaultAsync(x => x.Id == cp.Id);
             if (loaded != null)
             {

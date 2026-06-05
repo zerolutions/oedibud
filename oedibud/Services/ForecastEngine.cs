@@ -57,6 +57,7 @@ public sealed class ForecastEngine
 
         // Load once (wie vorher)
         var employees = await db.Employees.ToListAsync(ct);
+#pragma warning disable CS8602
         var contracts = await db.Contracts
             .Include(c => c.ContractPayments)
                 .ThenInclude(cp => cp.Payment)
@@ -69,6 +70,7 @@ public sealed class ForecastEngine
                     .ThenInclude(cp => cp.Contract)
                         .ThenInclude(c => c.Employee)
             .ToListAsync(ct);
+#pragma warning restore CS8602
 
         // Visible index map statt Columns.FindIndex(...) (output-identisch, nur schneller)
         var visibleIndex = BuildVisibleIndexMap(columns);

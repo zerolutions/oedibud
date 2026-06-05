@@ -42,7 +42,7 @@
             .Include(p => p.Project)
             .Include(p => p.ContractPayments)
                 .ThenInclude(cp => cp.Contract)
-                    .ThenInclude(c => c.Employee)
+                    .ThenInclude(c => c!.Employee)
             .OrderByDescending(p => p.Start)
             .ToListAsync();
     }

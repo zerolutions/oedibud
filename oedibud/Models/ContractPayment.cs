@@ -21,8 +21,8 @@ public class ContractPayment
     [NotMapped]
     public decimal ContractSharePercent
     {
-        get => ContractShare * 100m;
-        set => ContractShare = value / 100m;
+        get => decimal.Floor(ContractShare * 10000) / 100; // round down to 2 decimals
+        set => ContractShare = value / 100;
     }
 
     // Optional validity range
