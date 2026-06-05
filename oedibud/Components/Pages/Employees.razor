@@ -4,6 +4,8 @@
 @using System.Linq
 @using oedibud.Models
 @using oedibud.Data
+@using oedibud.Components.Editable
+
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 
 <PageTitle>Mitarbeiter</PageTitle>
@@ -28,20 +30,25 @@
         <tbody>
             @foreach (Employee e in employees)
             {
+                var isEditing = editingEmployeeId == e.Id;
+                var edit = isEditing ? editEmployeeCopies[e.Id] : e;
                 <tr>
                     <td class="fst-italic">@e.Id</td>
-                        <td>@if (editingEmployeeId == e.Id){<input class="form-control" @bind="editEmployeeCopies[e.Id].Name" />}else{@e.Name}</td>
-                        <td>@if (editingEmployeeId == e.Id){<input type="date" class="form-control" @bind="editEmployeeCopies[e.Id].HireDate" />}else{@e.HireDate.ToShortDateString()}</td>
-                        <td>@if (editingEmployeeId != e.Id){
-                            <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
-                            <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>}
-                            else
-                            {
-                                <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
-                                <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
-                            }
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
-                        </td>
+                    <td><EditableText @bind-Value="edit.Name" IsEditing="isEditing" /></td>
+                    <td><EditableDate @bind-Value="edit.HireDate" IsEditing="isEditing" /></td>
+                    <td>
+                    @if (isEditing)
+                    {
+                        <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
+                        <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
+                        <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
+                    </td>
                 </tr>
             }
         </tbody>
