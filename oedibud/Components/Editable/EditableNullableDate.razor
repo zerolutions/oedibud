@@ -1,0 +1,22 @@
+@if (!IsEditing)
+{
+    @(Value?.ToShortDateString() ?? "-")
+}
+else
+{
+    <input type="date" class="form-control" value="@(Value.HasValue ? Value.Value.ToString("yyyy-MM-dd") : "")" @onchange="HandleChange" />
+}
+
+@code {
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+
+    private async Task HandleChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d))
+            await ValueChanged.InvokeAsync(d);
+        else
+            await ValueChanged.InvokeAsync(null);
+    }
+}

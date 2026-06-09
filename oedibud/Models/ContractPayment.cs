@@ -15,8 +15,8 @@ public class ContractPayment
     public int PaymentId { get; set; }
     public Payment? Payment { get; set; }
 
-    // Percentage share 0..100
-    public decimal ContractShare { get; set; }
+    // Percentage share 0..1 fraction (1 = 100%)
+    public decimal ContractShare { get; set; } = 1m;
 
     [NotMapped]
     public decimal ContractSharePercent
