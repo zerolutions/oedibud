@@ -7,14 +7,21 @@
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 @inject oedibud.Services.DataChangeNotifier Notifier
 @inject CsvImportService CsvImporter
+@inject Microsoft.JSInterop.IJSRuntime JS
+@inject oedibud.Services.CsvExportService CsvExporter
 
 <PageTitle>Projektmittel</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h3 class="text-primary-emphasis mb-0">Projektmittel</h3>
-    <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
-        <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv">
+            <span class="bi bi-download me-1" aria-hidden="true"></span>CSV Export
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
+            <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
+        </button>
+    </div>
 </div>
 <hr />
 
@@ -46,6 +53,12 @@
     protected override async Task OnInitializedAsync()
     {
         await ReloadData();
+    }
+
+    private async Task ExportCsv()
+    {
+        var csv = CsvExporter.ExportPayments(payments);
+        await JS.InvokeVoidAsync("downloadFile", "payments.csv", csv);
     }
 
     private async Task ReloadData()

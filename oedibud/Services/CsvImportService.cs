@@ -178,15 +178,16 @@ public class CsvImportService
                     db.Projects.Add(new Project { Title = title, Start = start, End = end });
                     added++;
                 }
+                await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 errors.Add($"Zeile {i + 2}: {ex.Message}");
                 skipped++;
+                db.ChangeTracker.Clear();
             }
         }
 
-        await db.SaveChangesAsync();
         return new ImportResult(added, updated, skipped, errors);
     }
 
@@ -216,6 +217,10 @@ public class CsvImportService
                 var dedicatedStr = GetField(headers, row, "DetecatedTo");
                 if (dedicatedStr != null && Enum.TryParse<EmployeeGroup>(dedicatedStr, true, out var eg))
                     dedicatedTo = eg;
+
+                // FK validation
+                if (projectId > 0 && await db.Projects.FindAsync(projectId) is null)
+                    throw new InvalidOperationException($"Projekt-ID {projectId} existiert nicht.");
 
                 var idStr = GetField(headers, row, "Id");
                 if (int.TryParse(idStr, out int id) && id > 0)
@@ -251,15 +256,16 @@ public class CsvImportService
                     });
                     added++;
                 }
+                await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 errors.Add($"Zeile {i + 2}: {ex.Message}");
                 skipped++;
+                db.ChangeTracker.Clear();
             }
         }
 
-        await db.SaveChangesAsync();
         return new ImportResult(added, updated, skipped, errors);
     }
 
@@ -288,6 +294,10 @@ public class CsvImportService
                 var employerBrutto = TryParseDecimal(GetField(headers, row, "EmployerBruttoAddition")) ?? 0m;
                 var anualPayment = TryParseDecimal(GetField(headers, row, "AnualPaymentAddition")) ?? 0m;
                 var level = int.TryParse(GetField(headers, row, "Level"), out int lv) ? lv : 1;
+
+                // FK validation
+                if (employeeId > 0 && await db.Employees.FindAsync(employeeId) is null)
+                    throw new InvalidOperationException($"Mitarbeiter-ID {employeeId} existiert nicht.");
 
                 var idStr = GetField(headers, row, "Id");
                 if (int.TryParse(idStr, out int id) && id > 0)
@@ -327,15 +337,16 @@ public class CsvImportService
                     });
                     added++;
                 }
+                await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 errors.Add($"Zeile {i + 2}: {ex.Message}");
                 skipped++;
+                db.ChangeTracker.Clear();
             }
         }
 
-        await db.SaveChangesAsync();
         return new ImportResult(added, updated, skipped, errors);
     }
 
