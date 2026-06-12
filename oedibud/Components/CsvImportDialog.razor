@@ -1,0 +1,124 @@
+@using oedibud.Services
+
+@if (IsOpen)
+{
+    <div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Title</h5>
+                    <button type="button" class="btn-close" @onclick="Close" disabled="@loading"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!importDone && !loading)
+                    {
+                        <p class="text-muted small">
+                            Wähle eine CSV-Datei aus. Spalten werden anhand der Spaltentitel zugeordnet
+                            (Komma oder Semikolon als Trennzeichen). Fehlende Spalten werden mit
+                            Standardwerten belegt. Enthält die Datei eine <code>Id</code>-Spalte mit einem
+                            Wert, werden bestehende Einträge aktualisiert; andernfalls werden neue Einträge angelegt.
+                        </p>
+                        <InputFile OnChange="OnFileSelected" accept=".csv" class="form-control" />
+                        @if (!string.IsNullOrEmpty(fileName))
+                        {
+                            <p class="mt-2 text-muted small">Ausgewählt: <strong>@fileName</strong></p>
+                        }
+                    }
+
+                    @if (loading)
+                    {
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Importiere...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Importiere...</p>
+                        </div>
+                    }
+
+                    @if (result != null)
+                    {
+                        <div class="alert @(result.Errors.Count > 0 ? "alert-warning" : "alert-success") mb-2">
+                            <strong>Import abgeschlossen</strong><br />
+                            Neu hinzugefügt: <strong>@result.Added</strong> &nbsp;
+                            Aktualisiert: <strong>@result.Updated</strong> &nbsp;
+                            Übersprungen: <strong>@result.Skipped</strong>
+                        </div>
+                        @if (result.Errors.Count > 0)
+                        {
+                            <ul class="small text-danger mb-0">
+                                @foreach (var err in result.Errors)
+                                {
+                                    <li>@err</li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    @if (!importDone && !loading && csvContent != null)
+                    {
+                        <button class="btn btn-primary" @onclick="DoImport">
+                            <span class="bi bi-upload me-1" aria-hidden="true"></span>Importieren
+                        </button>
+                    }
+                    <button class="btn btn-secondary" @onclick="Close" disabled="@loading">
+                        @(importDone ? "Schließen" : "Abbrechen")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "CSV Import";
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public Func<string, Task<ImportResult>>? OnImport { get; set; }
+    [Parameter] public EventCallback OnImportCompleted { get; set; }
+
+    private string? fileName;
+    private string? csvContent;
+    private ImportResult? result;
+    private bool loading;
+    private bool importDone;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        fileName = e.File.Name;
+        csvContent = null;
+        result = null;
+        importDone = false;
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+        using var reader = new System.IO.StreamReader(stream);
+        csvContent = await reader.ReadToEndAsync();
+    }
+
+    private async Task DoImport()
+    {
+        if (OnImport == null || csvContent == null) return;
+        loading = true;
+        result = null;
+        StateHasChanged();
+        try
+        {
+            result = await OnImport(csvContent);
+            importDone = true;
+            await OnImportCompleted.InvokeAsync();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        fileName = null;
+        csvContent = null;
+        result = null;
+        loading = false;
+        importDone = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

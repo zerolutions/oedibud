@@ -3,13 +3,25 @@
 @using Microsoft.EntityFrameworkCore
 @using oedibud.Models
 @using oedibud.Data
+@using oedibud.Services
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 @inject oedibud.Services.DataChangeNotifier Notifier
+@inject CsvImportService CsvImporter
 
 <PageTitle>Projektmittel</PageTitle>
 
-<h3 class="text-primary-emphasis">Projektmittel</h3>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="text-primary-emphasis mb-0">Projektmittel</h3>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
+        <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
+    </button>
+</div>
 <hr />
+
+<CsvImportDialog Title="Projektmittel importieren"
+    @bind-IsOpen="showImport"
+    OnImport="csv => CsvImporter.ImportPaymentsAsync(csv)"
+    OnImportCompleted="ReloadData" />
 
 @if (!string.IsNullOrEmpty(message))
 {
@@ -29,8 +41,14 @@
     private List<Project> projects = new();
     private List<Contract> contracts = new();
     private string message = string.Empty;
+    private bool showImport;
 
     protected override async Task OnInitializedAsync()
+    {
+        await ReloadData();
+    }
+
+    private async Task ReloadData()
     {
         using var db = DbFactory.CreateDbContext();
         contracts = await db.Contracts
@@ -45,5 +63,6 @@
                     .ThenInclude(c => c!.Employee)
             .OrderByDescending(p => p.Start)
             .ToListAsync();
+        StateHasChanged();
     }
 }

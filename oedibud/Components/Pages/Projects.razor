@@ -3,12 +3,24 @@
 @using Microsoft.EntityFrameworkCore
 @using oedibud.Models
 @using oedibud.Data
+@using oedibud.Services
 @inject IDbContextFactory<BudgetDbContext> DbFactory
+@inject CsvImportService CsvImporter
 
 <PageTitle>Projekte</PageTitle>
 
-<h3 class="text-primary-emphasis">Projekte</h3>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="text-primary-emphasis mb-0">Projekte</h3>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
+        <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
+    </button>
+</div>
 <hr />
+
+<CsvImportDialog Title="Projekte importieren"
+    @bind-IsOpen="showImport"
+    OnImport="csv => CsvImporter.ImportProjectsAsync(csv)"
+    OnImportCompleted="LoadProjects" />
 
 @if (!string.IsNullOrEmpty(message))
 {
@@ -99,6 +111,7 @@
     };
     private string message = "";
     private Project? overlayProject = null;
+    private bool showImport;
 
     protected override async Task OnInitializedAsync()
     {

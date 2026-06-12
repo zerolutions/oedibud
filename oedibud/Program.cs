@@ -16,6 +16,7 @@ builder.Services.AddDbContextFactory<BudgetDbContext>(options =>
 
 builder.Services.AddSingleton<TvLSalaryService>();
 builder.Services.AddSingleton<DataChangeNotifier>();
+builder.Services.AddScoped<CsvImportService>();
 
 builder.Services.AddBlazorBootstrap();
 

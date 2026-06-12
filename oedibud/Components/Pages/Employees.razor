@@ -5,13 +5,25 @@
 @using oedibud.Models
 @using oedibud.Data
 @using oedibud.Components.Editable
+@using oedibud.Services
 
 @inject IDbContextFactory<BudgetDbContext> DbFactory
+@inject CsvImportService CsvImporter
 
 <PageTitle>Mitarbeiter</PageTitle>
 
-<h3 class="text-primary-emphasis">Mitarbeiter</h3>
-<hr/>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="text-primary-emphasis mb-0">Mitarbeiter</h3>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
+        <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
+    </button>
+</div>
+<hr />
+
+<CsvImportDialog Title="Mitarbeiter importieren"
+    @bind-IsOpen="showImport"
+    OnImport="csv => CsvImporter.ImportEmployeesAsync(csv)"
+    OnImportCompleted="LoadEmployees" />
 
 @if (!string.IsNullOrEmpty(message))
 {
@@ -87,6 +99,7 @@
     
     private string message = "";
     private Employee? overlayEmployee = null;
+    private bool showImport;
 
     protected override async Task OnInitializedAsync()
     {
