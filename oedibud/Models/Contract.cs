@@ -18,15 +18,15 @@ public class Contract
 
     public DateTime Start { get; set; }
     public DateTime End { get; set; }
-    public decimal Fte { get; set; }
+    public decimal Fte { get; set; } = 1m; // default 100% FTE
     public EmployeeGroup Group { get => group; set {
         group = value; 
         AnualPaymentAddition = GetJahressonderzahlungFactor(); 
         }
     }
     public int ExperienceMonth { get; set; }
-    public decimal EmployerBruttoAddition { get; set; }
-    public decimal AnualPaymentAddition { get; set; }
+    public decimal EmployerBruttoAddition { get; set; } = 0.28m; // default 28% employer contributions
+    public decimal AnualPaymentAddition { get; set; } = 0.4647m; // default value based on group E13
     [NotMapped]
     public decimal FtePercent
     {

@@ -5,6 +5,7 @@
 @using oedibud.Components.Editable
 @inject IDbContextFactory<BudgetDbContext> DbFactory
 @inject oedibud.Services.DataChangeNotifier Notifier
+@inject oedibud.Services.ForecastEngine ForecastEngine
 
 @{
     var displayPayments = FilterProjectId.HasValue
@@ -34,8 +35,8 @@ else
                 <th>Titel</th>
                 <th>Von</th>
                 <th>Bis</th>
-                <th>Betrag</th>
                 <th>Gewidmet</th>
+                <th>Betrag</th>
                 <th></th>
             </tr>
         </thead>
@@ -59,7 +60,6 @@ else
                     <td><EditableText @bind-Value="edit.Title" IsEditing="isEditing" /></td>
                     <td><EditableDate @bind-Value="edit.Start" IsEditing="isEditing" /></td>
                     <td><EditableDate @bind-Value="edit.End" IsEditing="isEditing" /></td>
-                    <td><EditableNumber @bind-Value="edit.Amount" IsEditing="isEditing" Step="1" DisplayText="@(isEditing ? null : p.Amount.ToString("C"))" /></td>
                     <td>
                         @if (isEditing)
                         {
@@ -74,6 +74,22 @@ else
                         else
                         {
                             @(p.DetecatedTo?.ToString() ?? "-")
+                        }
+                    </td>
+                    <td>
+                        @if (isEditing)
+                        {
+                            <div class="d-flex align-items-center gap-1">
+                                <EditableNumber @bind-Value="edit.Amount" IsEditing="true" Step="1" />
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
+                                    @onclick="() => OpenCalculator(edit.Start, edit.End, edit.DetecatedTo, v => { edit.Amount = v; })">
+                                    <span class="bi bi-calculator" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <EditableNumber @bind-Value="edit.Amount" IsEditing="false" Step="1" DisplayText="@p.Amount.ToString("C")" />
                         }
                     </td>
                     <td>
@@ -113,7 +129,6 @@ else
                     <td><EditableText @bind-Value="newPaymentInput.Title" IsEditing="true" /></td>
                     <td><EditableDate @bind-Value="newPaymentInput.Start" IsEditing="true" /></td>
                     <td><EditableDate @bind-Value="newPaymentInput.End" IsEditing="true" /></td>
-                    <td><EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="true" Step="1" /></td>
                     <td>
                         <select class="form-control" @bind="newPaymentInput.DetecatedTo">
                             <option value="">-- keine Angabe --</option>
@@ -122,6 +137,15 @@ else
                                 <option value="@g">@g</option>
                             }
                         </select>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-1">
+                            <EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="true" Step="1" />
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
+                                @onclick="() => OpenCalculator(newPaymentInput.Start, newPaymentInput.End, newPaymentInput.DetecatedTo, v => { newPaymentInput.Amount = v; })">
+                                <span class="bi bi-calculator" aria-hidden="true"></span>
+                            </button>
+                        </div>
                     </td>
                     <td>
                         <button class="btn btn-sm btn-success" @onclick="AddPayment">Hinzufügen</button>
@@ -204,6 +228,79 @@ else
     </SubTableOverlay>
 }
 
+@if (showCalculatorModal)
+{
+    <div class="modal-backdrop show" style="z-index: 1055;"></div>
+    <div class="modal d-block" tabindex="-1" style="z-index: 1060;" @onclick="() => showCalculatorModal = false">
+        <div class="modal-dialog" @onclick:stopPropagation>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><span class="bi bi-calculator me-2" aria-hidden="true"></span>Betrag berechnen</h5>
+                    <button type="button" class="btn-close" @onclick="() => showCalculatorModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">Von</label>
+                        <div class="col-sm-6"><input type="date" class="form-control" @bind="calcStart"  /></div>
+                    </div>
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">Bis</label>
+                        <div class="col-sm-6"><input type="date" class="form-control" @bind="calcEnd" /></div>
+                    </div>
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">Gruppe</label>
+                        <div class="col-sm-6">
+                            <select class="form-select" @onchange="e => OnCalcGroupChanged(e.Value!.ToString()!)">
+                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                                {
+                                    <option value="@g" selected="@(calcGroup == g)">@GetGroupName(g)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">Stufe</label>
+                        <div class="col-sm-6">
+                            <select class="form-select" @bind="calcLevel">
+                                @for (int lvl = 1; lvl <= 6; lvl++)
+                                {
+                                    <option value="@lvl">@lvl</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">Anteil (%)</label>
+                        <div class="col-sm-6"><input type="number" class="form-control" @bind="calcFtePercent" min="0" max="100" step="1" /></div>
+                    </div>
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">AG Auslage (%)</label>
+                        <div class="col-sm-6"><input type="number" class="form-control" @bind="calcEmployerBruttoAdditionPercent" min="0" step="0.01" /></div>
+                    </div>
+                    <div class="mb-2 row g-2 align-items-center">
+                        <label class="col-sm-6 col-form-label fw-semibold">Jahressonderzahlung (%)</label>
+                        <div class="col-sm-6"><input type="number" class="form-control" @bind="calcAnualPaymentAdditionPercent" min="0" step="0.01" /></div>
+                    </div>
+                    @if (calcResult.HasValue)
+                    {
+                        <div class="alert alert-success mt-3 mb-0">
+                            <strong>Bruttowert: @calcResult.Value.ToString("C")</strong>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showCalculatorModal = false">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" @onclick="CalculateAmount">Berechnen</button>
+                    @if (calcResult.HasValue)
+                    {
+                        <button type="button" class="btn btn-success" @onclick="ConfirmCalcAmount">Übernehmen</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public List<Payment> payments { get; set; } = new();
     [Parameter] public List<Project> projects { get; set; } = new();
@@ -224,6 +321,78 @@ else
     private Dictionary<int, ContractPayment> contractAssignInputs = new();
     private HashSet<int> editingContractAssignIds = new();
     private Dictionary<int, ContractPayment> editContractAssignCopies = new();
+
+    // --- Amount Calculator ---
+    private bool showCalculatorModal = false;
+    private Action<decimal>? onCalcConfirm;
+    private DateTime calcStart;
+    private DateTime calcEnd;
+    private EmployeeGroup calcGroup = EmployeeGroup.E13;
+    private int calcLevel = 1;
+    private decimal calcFtePercent = 100m;
+    private decimal calcEmployerBruttoAdditionPercent = 20m;
+    private decimal calcAnualPaymentAdditionPercent = 46.47m;
+    private decimal? calcResult;
+
+    private void OpenCalculator(DateTime start, DateTime end, EmployeeGroup? group, Action<decimal> onConfirm)
+    {
+        calcStart = start;
+        calcEnd = end;
+        calcGroup = group ?? EmployeeGroup.E13;
+        var temp = new Contract();
+        temp.Group = calcGroup;
+        calcLevel = temp.Level;
+        calcFtePercent = temp.FtePercent;
+        calcAnualPaymentAdditionPercent = temp.AnualPaymentAdditionPercent;
+        calcEmployerBruttoAdditionPercent = temp.EmployerBruttoAdditionPercent;
+        calcResult = null;
+        onCalcConfirm = onConfirm;
+        showCalculatorModal = true;
+    }
+
+    private void OnCalcGroupChanged(string value)
+    {
+        if (Enum.TryParse<EmployeeGroup>(value, out var g))
+        {
+            calcGroup = g;
+            var temp = new Contract();
+            temp.Group = g;
+            calcAnualPaymentAdditionPercent = temp.AnualPaymentAddition * 100m;
+        }
+    }
+
+    private void CalculateAmount()
+    {
+        int expMonths = (calcLevel - 1) * 12;
+        calcResult = ForecastEngine.CalculateTotalCost(
+            calcStart, calcEnd,
+            calcGroup, expMonths,
+            calcFtePercent / 100m,
+            calcEmployerBruttoAdditionPercent / 100m,
+            calcAnualPaymentAdditionPercent / 100m);
+    }
+
+    private void ConfirmCalcAmount()
+    {
+        if (calcResult.HasValue)
+        {
+            onCalcConfirm?.Invoke(Math.Round(calcResult.Value, 0));
+            showCalculatorModal = false;
+        }
+    }
+
+    private string GetGroupName(EmployeeGroup group)
+    {
+        var mem = typeof(EmployeeGroup).GetMember(group.ToString()).FirstOrDefault();
+        if (mem != null)
+        {
+            var disp = mem.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.DisplayAttribute), false)
+                         .OfType<System.ComponentModel.DataAnnotations.DisplayAttribute>()
+                         .FirstOrDefault();
+            if (disp != null) return disp.Name ?? group.ToString();
+        }
+        return group.ToString();
+    }
 
     protected override void OnInitialized()
     {

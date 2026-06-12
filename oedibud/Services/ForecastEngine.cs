@@ -94,10 +94,7 @@ public sealed class ForecastEngine
             foreach (var c in empContracts)
             {
                 var monthlyCostFunc = BuildMonthlyCostFunc(
-                    contract: c,
-                    contractStart: c.Start,
-                    contractEnd: c.End,
-                    fte: (decimal)c.Fte
+                    contract: c
                 );
 
                 // monthly costs per visible month
@@ -277,10 +274,7 @@ public sealed class ForecastEngine
                     }
 
                     var monthlyCostFunc = BuildMonthlyCostFunc(
-                        contract: contract,
-                        contractStart: contract.Start,
-                        contractEnd: contract.End,
-                        fte: (decimal)contract.Fte
+                        contract: contract
                     );
 
                     var cpAlloc = new decimal[months];
@@ -402,6 +396,34 @@ public sealed class ForecastEngine
         };
     }
 
+    /// <summary>
+    /// Berechnet die Gesamtkosten eines fiktiven Vertrags über den angegebenen Zeitraum.
+    /// </summary>
+    public decimal CalculateTotalCost(
+        DateTime start, DateTime end,
+        EmployeeGroup group, int experienceMonth, decimal fte,
+        decimal employerBruttoAddition, decimal anualPaymentAddition)
+    {
+        var fakeContract = new Contract
+        {
+            Start = start,
+            End = end,
+            ExperienceMonth = experienceMonth,
+            Fte = fte,
+            EmployerBruttoAddition = employerBruttoAddition,
+        };
+        fakeContract.Group = group;                          // triggers AnualPaymentAddition default
+        fakeContract.AnualPaymentAddition = anualPaymentAddition; // user override
+
+        var costFunc = BuildMonthlyCostFunc(fakeContract);
+
+        decimal total = 0m;
+        for (var m = MonthStart(start); m <= MonthStart(end); m = m.AddMonths(1))
+            total += costFunc(m);
+
+        return total;
+    }
+
     // -----------------------
     // Helper
     // -----------------------
@@ -414,14 +436,10 @@ public sealed class ForecastEngine
         return cols;
     }
 
-   private Func<DateTime, decimal> BuildMonthlyCostFunc(
-    Contract contract,
-    DateTime contractStart,
-    DateTime contractEnd,
-    decimal fte)
+   private Func<DateTime, decimal> BuildMonthlyCostFunc(Contract contract)
     {
-        var cStart = MonthStart(contractStart);
-        var cEnd = MonthStart(contractEnd);
+        var cStart = MonthStart(contract.Start);
+        var cEnd = MonthStart(contract.End);
 
         return (DateTime monthStart) =>
         {
@@ -439,16 +457,16 @@ public sealed class ForecastEngine
                 var dec1 = new DateTime(year, 12, 1);
 
                 // Anspruch nur wenn am 01.12. im Vertrag
-                if (contractStart <= dec1 && contractEnd >= dec1)
+                if (contract.Start <= dec1 && contract.End >= dec1)
                 {
                     decimal jszFactor = contract.AnualPaymentAddition;
 
                     decimal referenceSalary;
 
                     // Sonderfall: Start nach 31.08.
-                    if (contractStart > new DateTime(year, 8, 31))
+                    if (contract.Start > new DateTime(year, 8, 31))
                     {
-                        var firstFullMonth = MonthStart(contractStart.AddMonths(1));
+                        var firstFullMonth = MonthStart(contract.Start.AddMonths(1));
                         int lvl = contract.GetLevelAt(firstFullMonth);
                         referenceSalary = _tvL.GetSalary(contract.Group, lvl);
                     }
@@ -492,7 +510,7 @@ public sealed class ForecastEngine
                 }
             }
 
-            return sal * fte;
+            return sal * contract.Fte;
         };
     }
 
