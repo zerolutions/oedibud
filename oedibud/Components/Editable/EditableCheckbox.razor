@@ -1,0 +1,16 @@
+@if (!IsEditing)
+{
+    <input type="checkbox" class="form-check-input" checked="@Value" disabled />
+}
+else
+{
+    <input type="checkbox" class="form-check-input"
+           checked="@Value"
+           @onchange="async e => await ValueChanged.InvokeAsync((bool)e.Value!)" />
+}
+
+@code {
+    [Parameter] public bool Value { get; set; }
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+}

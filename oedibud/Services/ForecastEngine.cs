@@ -397,6 +397,44 @@ public sealed class ForecastEngine
     }
 
     /// <summary>
+    /// Berechnet den gebundenen Betrag eines Payments als Summe der Vertragskosten
+    /// aller zugewiesenen ContractPayments im geklammerten Zeitraum
+    /// (Payment-Zeitraum ∩ Vertrags-Zeitraum ∩ CP-Zeitraum), gewichtet mit ContractShare.
+    /// Verwendet payment.ContractPayments direkt (müssen mit Contract geladen sein).
+    /// </summary>
+    public decimal CalculateBoundAmount(Payment payment)
+    {
+        decimal total = 0m;
+        var payStart = MonthStart(payment.Start);
+        var payEnd   = MonthStart(payment.End);
+
+        foreach (var cp in payment.ContractPayments)
+        {
+            var contract = cp.Contract;
+            if (contract is null) continue;
+
+            var cpStart = cp.Start.HasValue ? MonthStart(cp.Start.Value) : payStart;
+            var cpEnd   = cp.End.HasValue   ? MonthStart(cp.End.Value)   : payEnd;
+
+            // clamp to the tightest of all three ranges (payment ∩ contract ∩ cp)
+            var rangeStart = payStart > MonthStart(contract.Start) ? payStart : MonthStart(contract.Start);
+            if (cpStart > rangeStart) rangeStart = cpStart;
+
+            var rangeEnd = payEnd < MonthStart(contract.End) ? payEnd : MonthStart(contract.End);
+            if (cpEnd < rangeEnd) rangeEnd = cpEnd;
+
+            if (rangeStart > rangeEnd) continue;
+
+            var costFunc = BuildMonthlyCostFunc(contract);
+
+            for (var m = rangeStart; m <= rangeEnd; m = m.AddMonths(1))
+                total += costFunc(m) * cp.ContractShare;
+        }
+
+        return total;
+    }
+
+    /// <summary>
     /// Berechnet die Gesamtkosten eines fiktiven Vertrags über den angegebenen Zeitraum.
     /// </summary>
     public decimal CalculateTotalCost(

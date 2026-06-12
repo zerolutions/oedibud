@@ -20,5 +20,6 @@ namespace oedibud.Models
         
         // Navigation: assignments to contracts (many-to-many with extra fields)
         public List<ContractPayment> ContractPayments { get; set; } = new();
+        public bool AmountIsContractsBound { get; set; } = false; // new property to indicate if amount is contracts-bound
     }
 }

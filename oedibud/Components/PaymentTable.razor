@@ -37,11 +37,12 @@ else
                 <th>Bis</th>
                 <th>Gewidmet</th>
                 <th>Betrag</th>
+                <th>MA-Gebunden</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var p in displayPayments)
+            @foreach (Payment p in displayPayments)
             {
                 var isEditing = editingPaymentIds.Contains(p.Id);
                 var edit = isEditing ? editPaymentCopies[p.Id] : p;
@@ -80,17 +81,33 @@ else
                         @if (isEditing)
                         {
                             <div class="d-flex align-items-center gap-1">
-                                <EditableNumber @bind-Value="edit.Amount" IsEditing="true" Step="1" />
-                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
-                                    @onclick="() => OpenCalculator(edit.Start, edit.End, edit.DetecatedTo, v => { edit.Amount = v; })">
-                                    <span class="bi bi-calculator" aria-hidden="true"></span>
-                                </button>
+                                @if (edit.AmountIsContractsBound)
+                                {
+                                    <input type="number" class="form-control" value="@edit.Amount" disabled />
+                                    <span class="text-muted small ms-1" title="Betrag wird aus zugewiesenen Verträgen berechnet">
+                                        <span class="bi bi-lock" aria-hidden="true"></span>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <EditableNumber @bind-Value="edit.Amount" IsEditing="true" Step="1" />
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
+                                        @onclick="() => OpenCalculator(edit.Start, edit.End, edit.DetecatedTo, v => { edit.Amount = v; })">
+                                        <span class="bi bi-calculator" aria-hidden="true"></span>
+                                    </button>
+                                }
                             </div>
                         }
                         else
                         {
                             <EditableNumber @bind-Value="edit.Amount" IsEditing="false" Step="1" DisplayText="@p.Amount.ToString("C")" />
                         }
+                    </td>
+                    <td>
+                        <EditableCheckbox
+                            Value="edit.AmountIsContractsBound"
+                            ValueChanged="v => OnAmountBoundChanged(edit, v)"
+                            IsEditing="isEditing" />
                     </td>
                     <td>
                         @if (isEditing)
@@ -146,6 +163,12 @@ else
                                 <span class="bi bi-calculator" aria-hidden="true"></span>
                             </button>
                         </div>
+                    </td>
+                    <td>
+                        <EditableCheckbox
+                            Value="newPaymentInput.AmountIsContractsBound"
+                            ValueChanged="v => OnAmountBoundChanged(newPaymentInput, v)"
+                            IsEditing="true" />
                     </td>
                     <td>
                         <button class="btn btn-sm btn-success" @onclick="AddPayment">Hinzufügen</button>
@@ -394,6 +417,40 @@ else
         return group.ToString();
     }
 
+    // --- Amount bound to contracts ---
+
+    private void OnAmountBoundChanged(Payment editPayment, bool newValue)
+    {
+        editPayment.AmountIsContractsBound = newValue;
+        if (newValue)
+        {
+            // edit copy has no ContractPayments loaded — use original from list with edit dates
+            var orig = payments.FirstOrDefault(x => x.Id == editPayment.Id);
+            if (orig != null)
+            {
+                var forCalc = new Payment { Start = editPayment.Start, End = editPayment.End, ContractPayments = orig.ContractPayments };
+                editPayment.Amount = Math.Round(ForecastEngine.CalculateBoundAmount(forCalc), 0);
+            }
+        }
+    }
+
+    private async Task RecalcAndSaveBoundAmount(Payment p)
+    {
+        if (!p.AmountIsContractsBound) return;
+        p.Amount = Math.Round(ForecastEngine.CalculateBoundAmount(p), 0);
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            var dbItem = await db.Payments.FindAsync(p.Id);
+            if (dbItem != null)
+            {
+                dbItem.Amount = p.Amount;
+                await db.SaveChangesAsync();
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
     protected override void OnInitialized()
     {
         newPaymentInput.ProjectId = FilterProjectId ?? 0;
@@ -466,7 +523,8 @@ else
             End = p.End,
             Amount = p.Amount,
             DetecatedTo = p.DetecatedTo,
-            Project = p.Project
+            Project = p.Project,
+            AmountIsContractsBound = p.AmountIsContractsBound
         };
     }
 
@@ -494,8 +552,22 @@ else
                 dbItem.Title = copy.Title;
                 dbItem.Start = copy.Start;
                 dbItem.End = copy.End;
-                dbItem.Amount = copy.Amount;
                 dbItem.DetecatedTo = copy.DetecatedTo;
+                dbItem.AmountIsContractsBound = copy.AmountIsContractsBound;
+
+                // If bound: recalculate amount with potentially new Start/End, using the
+                // original payment's ContractPayments (which are fully loaded with Contract)
+                if (copy.AmountIsContractsBound)
+                {
+                    var orig = payments.FirstOrDefault(x => x.Id == id);
+                    if (orig != null)
+                    {
+                        var forCalc = new Payment { Start = copy.Start, End = copy.End, ContractPayments = orig.ContractPayments };
+                        copy.Amount = Math.Round(ForecastEngine.CalculateBoundAmount(forCalc), 0);
+                    }
+                }
+
+                dbItem.Amount = copy.Amount;
                 await db.SaveChangesAsync();
 
                 var idx = payments.FindIndex(x => x.Id == id);
@@ -508,6 +580,7 @@ else
                     payments[idx].End = dbItem.End;
                     payments[idx].Amount = dbItem.Amount;
                     payments[idx].DetecatedTo = dbItem.DetecatedTo;
+                    payments[idx].AmountIsContractsBound = dbItem.AmountIsContractsBound;
                 }
                 await OnMessageChanged.InvokeAsync("Projektmittel gespeichert.");
             }
@@ -668,6 +741,7 @@ else
         {
             CancelEditContractAssignment(id);
         }
+        await RecalcAndSaveBoundAmount(p);
     }
 
     private async Task AddContractAssignment(Payment p)
@@ -713,6 +787,7 @@ else
         {
             await OnMessageChanged.InvokeAsync(ex.Message);
         }
+        await RecalcAndSaveBoundAmount(p);
     }
 
     private async Task DeleteContractAssignment(int contractPaymentId, Payment p)
@@ -734,5 +809,6 @@ else
         {
             await OnMessageChanged.InvokeAsync(ex.Message);
         }
+        await RecalcAndSaveBoundAmount(p);
     }
 }
