@@ -361,6 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-oedibud/oedibud.db*
+oedibud/oedibud.db
 oedibud/oedibud.db-shm
 oedibud/oedibud.db-wal
