@@ -133,7 +133,7 @@ public sealed class ForecastEngine
                         continue;
                     }
 
-                    var remaining = p.Amount * c.EmployerBruttoAddition;
+                    var remaining = p.Amount;
 
                     // greedy month-by-month (exakt wie vorher)
                     for (var m = startMonthCp; m <= endMonthCp && remaining > 0; m = m.AddMonths(1))

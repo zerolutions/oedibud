@@ -211,6 +211,7 @@ public class CsvImportService
                 var end = TryParseDate(GetField(headers, row, "End")) ?? DateTime.Today;
                 var projectId = int.TryParse(GetField(headers, row, "ProjectId"), out int pid) ? pid : 0;
                 var amount = TryParseDecimal(GetField(headers, row, "Amount")) ?? 0m;
+                var contractsBound = TryParseBool(GetField(headers, row, "AmountIsContractsBound")) ?? false;
                 EmployeeGroup? dedicatedTo = null;
                 var dedicatedStr = GetField(headers, row, "DetecatedTo");
                 if (dedicatedStr != null && Enum.TryParse<EmployeeGroup>(dedicatedStr, true, out var eg))
@@ -227,6 +228,7 @@ public class CsvImportService
                         existing.End = end;
                         existing.ProjectId = projectId;
                         existing.Amount = amount;
+                        existing.AmountIsContractsBound = contractsBound;
                         existing.DetecatedTo = dedicatedTo;
                         updated++;
                     }
@@ -235,7 +237,7 @@ public class CsvImportService
                         db.Payments.Add(new Payment
                         {
                             Id = id, Title = title, Start = start, End = end,
-                            ProjectId = projectId, Amount = amount, DetecatedTo = dedicatedTo
+                            ProjectId = projectId, Amount = amount, AmountIsContractsBound = contractsBound, DetecatedTo = dedicatedTo
                         });
                         added++;
                     }
@@ -245,7 +247,7 @@ public class CsvImportService
                     db.Payments.Add(new Payment
                     {
                         Title = title, Start = start, End = end,
-                        ProjectId = projectId, Amount = amount, DetecatedTo = dedicatedTo
+                        ProjectId = projectId, Amount = amount, AmountIsContractsBound = contractsBound, DetecatedTo = dedicatedTo
                     });
                     added++;
                 }
@@ -357,6 +359,14 @@ public class CsvImportService
         var normalized = value.Replace(',', '.');
         if (decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
             return d;
+        return null;
+    }
+
+    private static bool? TryParseBool(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (bool.TryParse(value, out var b))
+            return b;
         return null;
     }
 }

@@ -37,7 +37,7 @@ else
                 <th>Bis</th>
                 <th>Gewidmet</th>
                 <th>Betrag</th>
-                <th>MA-Gebunden</th>
+                <th title="Vertragsgebunden: Summe setzt sich aus zugewiesenen Verträgen zusammen">VG</th>
                 <th></th>
             </tr>
         </thead>
@@ -81,16 +81,9 @@ else
                         @if (isEditing)
                         {
                             <div class="d-flex align-items-center gap-1">
-                                @if (edit.AmountIsContractsBound)
+                                <EditableNumber @bind-Value="edit.Amount" IsEditing="!edit.AmountIsContractsBound" Step="1" DisplayText="@p.Amount.ToString("C")" ShowCurrencySymbol="true" />
+                                @if (!edit.AmountIsContractsBound)
                                 {
-                                    <input type="number" class="form-control" value="@edit.Amount" disabled />
-                                    <span class="text-muted small ms-1" title="Betrag wird aus zugewiesenen Verträgen berechnet">
-                                        <span class="bi bi-lock" aria-hidden="true"></span>
-                                    </span>
-                                }
-                                else
-                                {
-                                    <EditableNumber @bind-Value="edit.Amount" IsEditing="true" Step="1" />
                                     <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
                                         @onclick="() => OpenCalculator(edit.Start, edit.End, edit.DetecatedTo, v => { edit.Amount = v; })">
                                         <span class="bi bi-calculator" aria-hidden="true"></span>
@@ -100,7 +93,7 @@ else
                         }
                         else
                         {
-                            <EditableNumber @bind-Value="edit.Amount" IsEditing="false" Step="1" DisplayText="@p.Amount.ToString("C")" />
+                            <EditableNumber @bind-Value="edit.Amount" IsEditing="false" Step="1" DisplayText="@p.Amount.ToString("C")" ShowCurrencySymbol="true" />
                         }
                     </td>
                     <td>
@@ -157,11 +150,14 @@ else
                     </td>
                     <td>
                         <div class="d-flex align-items-center gap-1">
-                            <EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="true" Step="1" />
-                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
-                                @onclick="() => OpenCalculator(newPaymentInput.Start, newPaymentInput.End, newPaymentInput.DetecatedTo, v => { newPaymentInput.Amount = v; })">
-                                <span class="bi bi-calculator" aria-hidden="true"></span>
-                            </button>
+                            <EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="!newPaymentInput.AmountIsContractsBound" Step="1" DisplayText="@newPaymentInput.Amount.ToString("C")" ShowCurrencySymbol="true" />
+                            @if (!newPaymentInput.AmountIsContractsBound)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
+                                    @onclick="() => OpenCalculator(newPaymentInput.Start, newPaymentInput.End, newPaymentInput.DetecatedTo, v => { newPaymentInput.Amount = v; })">
+                                    <span class="bi bi-calculator" aria-hidden="true"></span>
+                                </button>
+                            }
                         </div>
                     </td>
                     <td>
@@ -608,9 +604,9 @@ else
             await OnMessageChanged.InvokeAsync("Bitte einen Titel vergeben.");
             return;
         }
-        if (newPaymentInput.Amount == 0m)
+        if (newPaymentInput.Amount == 0m && !newPaymentInput.AmountIsContractsBound)
         {
-            await OnMessageChanged.InvokeAsync("Betrag muss größer als 0 sein.");
+            await OnMessageChanged.InvokeAsync("Betrag muss größer als 0 sein oder vertragsgebunden.");
             return;
         }
         try
