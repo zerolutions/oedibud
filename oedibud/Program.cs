@@ -23,6 +23,7 @@ builder.Services.AddBlazorBootstrap();
 
 
 builder.Services.AddScoped<ForecastEngine>();
+builder.Services.AddScoped<UserSettingsService>();
 
 var app = builder.Build();
 

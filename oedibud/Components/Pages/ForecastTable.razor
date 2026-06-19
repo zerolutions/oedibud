@@ -2,6 +2,7 @@
 @using oedibud.Services
 @inject ForecastEngine Engine
 @inject oedibud.Services.DataChangeNotifier Notifier
+@inject UserSettingsService SettingsService
 
 @implements IDisposable
 
@@ -23,24 +24,56 @@
         _onChangeHandler = () => _ = InvokeAsync(LoadDataAsync);
         Notifier.OnChange += _onChangeHandler;
 
+        var saved = await SettingsService.LoadAsync();
+        StartMonth = saved.StartMonth;
+        QuarterView = saved.QuarterView;
+        _savedExpandedEmployeeIds = UserSettingsService.DecodeIds(saved.ExpandedEmployeeIds);
+        _savedExpandedProjectIds  = UserSettingsService.DecodeIds(saved.ExpandedProjectIds);
+
         await LoadDataAsync();
     }
+
+    // Ids loaded from DB before the first forecast result is available
+    private HashSet<int>? _savedExpandedEmployeeIds;
+    private HashSet<int>? _savedExpandedProjectIds;
 
     private async Task LoadDataAsync()
     {
         Result = await Engine.BuildAsync(StartMonth, Months);
 
-        // wie vorher: standardmäßig expanden (optional; entspricht deinem "Expanded.Add(id)" Verhalten)
-        ExpandedEmployees = Result.Nodes
-            .Where(n => n.RootKind == ForecastEngine.RootKind.Employee && n.Level == 0 && n.EmployeeId.HasValue)
-            .Select(n => n.RootId)
-            .ToHashSet();
-
-        ExpandedProjects = Result.Nodes
-            .Where(n => n.RootKind == ForecastEngine.RootKind.Project && n.Level == 0 && n.ProjectId.HasValue)
-            .Select(n => n.RootId)
-            .ToHashSet();
+        // On first load restore saved state; on subsequent reloads keep current expansion
+        if (_savedExpandedEmployeeIds is not null)
+        {
+            ExpandedEmployees = _savedExpandedEmployeeIds.Count > 0
+                ? _savedExpandedEmployeeIds
+                : GetTopLevelIds(ForecastEngine.RootKind.Employee);
+            _savedExpandedEmployeeIds = null;
+        }
+        if (_savedExpandedProjectIds is not null)
+        {
+            ExpandedProjects = _savedExpandedProjectIds.Count > 0
+                ? _savedExpandedProjectIds
+                : GetTopLevelIds(ForecastEngine.RootKind.Project);
+            _savedExpandedProjectIds = null;
+        }
     }
+
+    private async Task PersistSettingsAsync()
+    {
+        await SettingsService.SaveAsync(new oedibud.Models.UserSettings
+        {
+            StartMonth          = StartMonth,
+            QuarterView         = QuarterView,
+            ExpandedEmployeeIds = UserSettingsService.EncodeIds(ExpandedEmployees),
+            ExpandedProjectIds  = UserSettingsService.EncodeIds(ExpandedProjects),
+        });
+    }
+
+    private HashSet<int> GetTopLevelIds(ForecastEngine.RootKind kind) =>
+        Result!.Nodes
+            .Where(n => n.RootKind == kind && n.Level == 0)
+            .Select(n => n.RootId)
+            .ToHashSet();
 
     private async Task ToggleQuarterView()
     {
@@ -52,6 +85,7 @@
             StartMonth = new DateTime(StartMonth.Year, q * 3 + 1, 1);
         }
         await LoadDataAsync();
+        await PersistSettingsAsync();
     }
 
     // Display columns: 12 months or 12 quarters aggregated from 36 months
@@ -80,18 +114,45 @@
         Debug.WriteLine("NextMonthClicked");
         StartMonth = StartMonth.AddMonths(m);
         await LoadDataAsync();
+        await PersistSettingsAsync();
     }
 
-    private void ToggleEmployee(int empId)
+    private async Task ToggleEmployee(int empId)
     {
         if (ExpandedEmployees.Contains(empId)) ExpandedEmployees.Remove(empId);
         else ExpandedEmployees.Add(empId);
+        await PersistSettingsAsync();
     }
 
-    private void ToggleProject(int projectId)
+    private async Task ToggleProject(int projectId)
     {
         if (ExpandedProjects.Contains(projectId)) ExpandedProjects.Remove(projectId);
         else ExpandedProjects.Add(projectId);
+        await PersistSettingsAsync();
+    }
+
+    private async Task ExpandAllProjects()
+    {
+        ExpandedProjects = GetTopLevelIds(ForecastEngine.RootKind.Project);
+        await PersistSettingsAsync();
+    }
+
+    private async Task CollapseAllProjects()
+    {
+        ExpandedProjects.Clear();
+        await PersistSettingsAsync();
+    }
+
+    private async Task ExpandAllEmployees()
+    {
+        ExpandedEmployees = GetTopLevelIds(ForecastEngine.RootKind.Employee);
+        await PersistSettingsAsync();
+    }
+
+    private async Task CollapseAllEmployees()
+    {
+        ExpandedEmployees.Clear();
+        await PersistSettingsAsync();
     }
 
     void IDisposable.Dispose()
@@ -139,8 +200,10 @@ else
     <table class="table table-sm table-borderless mt-3 text-end table-hover">
         <thead>
             <tr>
-                <th />
-                <th></th>
+                <th>
+                    <button class="btn btn-sm btn-outline-secondary pb-0 pt-0" title="Alle ausklappen" @onclick="ExpandAllProjects">+</button>
+                    <button class="btn btn-sm btn-outline-secondary pb-0 pt-0" title="Alle einklappen" @onclick="CollapseAllProjects">−</button>
+                </th>
                 @foreach (var col in DisplayColumns)
                 {
                     <th>@col</th>
@@ -157,11 +220,10 @@ else
                 {
                     <tr class="table-danger fw-bold">
                         <td>
-                            <button class="btn btn pb-0 pt-0" @onclick="() => ToggleProject(row.RootId)">
-                                @(ExpandedProjects.Contains(row.RootId) ? "-" : "+")
+                            <button title="@row.Title" class="btn btn-sm pb-0 pt-0 fw-bold" @onclick="() => ToggleProject(row.RootId)">
+                                @(ExpandedProjects.Contains(row.RootId) ? "- " : "+ ") @((MarkupString)row.Label)
                             </button>
                         </td>
-                        <td title="@row.Title">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < vals.Length; i++)
                         {
                             <td class="@(@vals[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(vals[i])</td>
@@ -171,7 +233,6 @@ else
                 else if (row.Level == 1)
                 {
                     <tr class="table-success">
-                        <td class="table-danger" />
                         <td title="@row.Title" style="padding-left:10px">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < vals.Length; i++)
                         {
@@ -182,7 +243,6 @@ else
                 else
                 {
                     <tr class="table-secondary">
-                        <td class="table-danger" />
                         <td title="@row.Title" style="padding-left:20px">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < vals.Length; i++)
                         {
@@ -194,7 +254,7 @@ else
         </tbody>
         <tfoot>
             <tr class="table-dark fw-bold">
-                <td />
+                @* <td /> *@
                 <td>Gesamt</td>
                 @{ var projTotals = DisplayValues(Result.ProjectTotals); }
                 @for (int i = 0; i < projTotals.Length; i++)
@@ -212,8 +272,10 @@ else
     <table class="table table-sm table-borderless mt-3 text-end table-hover">
         <thead>
             <tr>
-                <th />
-                <th></th>
+                <th>
+                    <button class="btn btn-sm btn-outline-secondary pb-0 pt-0" title="Alle ausklappen" @onclick="ExpandAllEmployees">+</button>
+                    <button class="btn btn-sm btn-outline-secondary pb-0 pt-0" title="Alle einklappen" @onclick="CollapseAllEmployees">−</button>
+                </th>
                 @foreach (var col in DisplayColumns)
                 {
                     <th>@col</th>
@@ -230,11 +292,10 @@ else
                 {
                     <tr class="table-primary fw-bold">
                         <td>
-                            <button class="btn btn pb-0 pt-0" @onclick="() => ToggleEmployee(row.RootId)">
-                                @(ExpandedEmployees.Contains(row.RootId) ? "-" : "+")
-                            </button>
+                            <button  title="@row.Title" class="btn btn-sm btn-outline-secondary pb-0 pt-0 fw-bold" @onclick="() => ToggleEmployee(row.RootId)">
+                                 @(ExpandedEmployees.Contains(row.RootId) ? "- " : "+ ") @((MarkupString)row.Label)
+                            </button> 
                         </td>
-                        <td title="@row.Title">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < vals.Length; i++)
                         {
                             <td class="@(@vals[i] < 0 ? "text-danger" : "")">@FormatCurrencyShort(vals[i])</td>
@@ -244,7 +305,6 @@ else
                 else if (row.Level == 1)
                 {
                     <tr class="table-secondary">
-                        <td class="table-primary" />
                         <td title="@row.Title" style="padding-left:10px">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < vals.Length; i++)
                         {
@@ -255,7 +315,6 @@ else
                 else
                 {
                     <tr class="table-success">
-                        <td class="table-primary" />
                         <td title="@row.Title" style="padding-left:20px">@((MarkupString)row.Label)</td>
                         @for (int i = 0; i < vals.Length; i++)
                         {
@@ -267,7 +326,6 @@ else
         </tbody>
         <tfoot>
             <tr class="table-dark fw-bold">
-                <td />
                 <td>Gesamt</td>
                 @{ var empTotals = DisplayValues(Result.EmployeeTotals); }
                 @for (int i = 0; i < empTotals.Length; i++)
@@ -278,22 +336,4 @@ else
         </tfoot>
     </table>
 
-    @* <table class="table table-borderless mt-5 w-25">
-        <thead>
-            <tr>
-                <th>Legende</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr class="table-primary">
-                <td class="fw-bold">Mitarbeiter | Gruppe</td>
-            </tr>
-            <tr class="table-secondary">
-                <td>Vertragslaufzeit</td>
-            </tr>
-            <tr class="table-success">
-                <td>Projekt | Anteil an Projektmittelsumme</td>
-            </tr>
-        </tbody>
-    </table> *@
 }
