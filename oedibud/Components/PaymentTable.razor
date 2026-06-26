@@ -18,234 +18,245 @@
         $"Vertragszuweisungen · PM-{overlayPayment.Id} · {overlayPayment.Title ?? "-"} · {overlayPayment.Start.ToShortDateString()} – {overlayPayment.End.ToShortDateString()}";
 }
 
-@if (!displayPayments.Any() && !ShowAddForm)
-{
-    <p><em>Keine Projektmittel vorhanden.</em></p>
-}
-else
-{
-    <table class="@tableClass">
-        <thead>
+<table class="@tableClass">
+    
+    <colgroup>
+        <col style="width: 1%" />
+        @if (showProjectCol)
+        {
+            <col />
+        }
+        <col />
+        <col />
+        <col />
+        <col />
+        <col />
+        <col />
+        <col />
+    </colgroup>
+    <thead>
+        <tr>
+            <th>ID</th>
+            @if (showProjectCol)
+            {
+                <th>Projekt</th>
+            }
+            <th>Titel</th>
+            <th>Von</th>
+            <th>Bis</th>
+            <th>Gewidmet</th>
+            <th>Betrag</th>
+            <th title="Vertragsgebunden: Summe setzt sich aus zugewiesenen Verträgen zusammen">VG</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (Payment p in displayPayments)
+        {
+            var isEditing = editingPaymentIds.Contains(p.Id);
+            var edit = isEditing ? editPaymentCopies[p.Id] : p;
+
             <tr>
-                <th>ID</th>
+                <td class="fst-italic">@p.Id</td>
                 @if (showProjectCol)
                 {
-                    <th>Projekt</th>
+                    <td>
+                        <EditableSelect @bind-Value="edit.ProjectId"
+                            IsEditing="isEditing"
+                            DisplayText="@(p.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == p.ProjectId)?.Title ?? "-")"
+                            Items="projects.Select(pr => new EditableSelect<int>.SelectItem{ Value = pr.Id, Text = pr.Title })" />
+                    </td>
                 }
-                <th>Titel</th>
-                <th>Von</th>
-                <th>Bis</th>
-                <th>Gewidmet</th>
-                <th>Betrag</th>
-                <th title="Vertragsgebunden: Summe setzt sich aus zugewiesenen Verträgen zusammen">VG</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (Payment p in displayPayments)
-            {
-                var isEditing = editingPaymentIds.Contains(p.Id);
-                var edit = isEditing ? editPaymentCopies[p.Id] : p;
-
-                <tr>
-                    <td class="fst-italic">@p.Id</td>
-                    @if (showProjectCol)
+                <td><EditableText @bind-Value="edit.Title" IsEditing="isEditing" /></td>
+                <td><EditableDate @bind-Value="edit.Start" IsEditing="isEditing" /></td>
+                <td><EditableDate @bind-Value="edit.End" IsEditing="isEditing" /></td>
+                <td>
+                    @if (isEditing)
                     {
-                        <td>
-                            <EditableSelect @bind-Value="edit.ProjectId"
-                                IsEditing="isEditing"
-                                DisplayText="@(p.Project?.Title ?? projects.FirstOrDefault(pr => pr.Id == p.ProjectId)?.Title ?? "-")"
-                                Items="projects.Select(pr => new EditableSelect<int>.SelectItem{ Value = pr.Id, Text = pr.Title })" />
-                        </td>
-                    }
-                    <td><EditableText @bind-Value="edit.Title" IsEditing="isEditing" /></td>
-                    <td><EditableDate @bind-Value="edit.Start" IsEditing="isEditing" /></td>
-                    <td><EditableDate @bind-Value="edit.End" IsEditing="isEditing" /></td>
-                    <td>
-                        @if (isEditing)
-                        {
-                            <select class="form-control" @bind="edit.DetecatedTo">
-                                <option value="">-- keine Angabe --</option>
-                                @foreach (var g in Enum.GetValues<EmployeeGroup>())
-                                {
-                                    <option value="@g">@g</option>
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            @(p.DetecatedTo?.ToString() ?? "-")
-                        }
-                    </td>
-                    <td>
-                        @if (isEditing)
-                        {
-                            <div class="d-flex align-items-center gap-1">
-                                <EditableNumber @bind-Value="edit.Amount" IsEditing="!edit.AmountIsContractsBound" Step="1" DisplayText="@p.Amount.ToString("C")" ShowCurrencySymbol="true" />
-                                @if (!edit.AmountIsContractsBound)
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
-                                        @onclick="() => OpenCalculator(edit.Start, edit.End, edit.DetecatedTo, v => { edit.Amount = v; })">
-                                        <span class="bi bi-calculator" aria-hidden="true"></span>
-                                    </button>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <EditableNumber @bind-Value="edit.Amount" IsEditing="false" Step="1" DisplayText="@p.Amount.ToString("C")" ShowCurrencySymbol="true" />
-                        }
-                    </td>
-                    <td>
-                        <EditableCheckbox
-                            Value="edit.AmountIsContractsBound"
-                            ValueChanged="v => OnAmountBoundChanged(edit, v)"
-                            IsEditing="isEditing" />
-                    </td>
-                    <td>
-                        @if (isEditing)
-                        {
-                            <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(p.Id)">Speichern</button>
-                            <button class="btn btn-sm btn-secondary me-1" @onclick="() => CancelEditPayment(p.Id)">Abbrechen</button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(p)">Bearbeiten</button>
-                            <button class="btn btn-sm btn-danger me-1" @onclick="() => DeletePayment(p)">Löschen</button>
-                            @if (ShowContractAssignments)
-                            {
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowPaymentOverlay(p)">Verträge zuweisen</button>
-                            }
-                        }
-                    </td>
-                </tr>
-            }
-            @if (ShowAddForm)
-            {
-                <tr>
-                    <td class="fst-italic text-muted">neu</td>
-                    @if (showProjectCol)
-                    {
-                        <td>
-                            <select class="form-control" @bind="newPaymentInput.ProjectId">
-                                <option value="0">-- auswählen --</option>
-                                @foreach (var pr in projects)
-                                {
-                                    <option value="@pr.Id">@pr.Title</option>
-                                }
-                            </select>
-                        </td>
-                    }
-                    <td><EditableText @bind-Value="newPaymentInput.Title" IsEditing="true" /></td>
-                    <td><EditableDate @bind-Value="newPaymentInput.Start" IsEditing="true" /></td>
-                    <td><EditableDate @bind-Value="newPaymentInput.End" IsEditing="true" /></td>
-                    <td>
-                        <select class="form-control" @bind="newPaymentInput.DetecatedTo">
+                        <select class="form-control" @bind="edit.DetecatedTo">
                             <option value="">-- keine Angabe --</option>
                             @foreach (var g in Enum.GetValues<EmployeeGroup>())
                             {
                                 <option value="@g">@g</option>
                             }
                         </select>
-                    </td>
-                    <td>
+                    }
+                    else
+                    {
+                        @(p.DetecatedTo?.ToString() ?? "-")
+                    }
+                </td>
+                <td>
+                    @if (isEditing)
+                    {
                         <div class="d-flex align-items-center gap-1">
-                            <EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="!newPaymentInput.AmountIsContractsBound" Step="1" DisplayText="@newPaymentInput.Amount.ToString("C")" ShowCurrencySymbol="true" />
-                            @if (!newPaymentInput.AmountIsContractsBound)
+                            <EditableNumber @bind-Value="edit.Amount" IsEditing="!edit.AmountIsContractsBound" Step="1" DisplayText="@p.Amount.ToString("C")" ShowCurrencySymbol="true" />
+                            @if (!edit.AmountIsContractsBound)
                             {
                                 <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
-                                    @onclick="() => OpenCalculator(newPaymentInput.Start, newPaymentInput.End, newPaymentInput.DetecatedTo, v => { newPaymentInput.Amount = v; })">
+                                    @onclick="() => OpenCalculator(edit.Start, edit.End, edit.DetecatedTo, v => { edit.Amount = v; })">
                                     <span class="bi bi-calculator" aria-hidden="true"></span>
                                 </button>
                             }
                         </div>
-                    </td>
-                    <td>
-                        <EditableCheckbox
-                            Value="newPaymentInput.AmountIsContractsBound"
-                            ValueChanged="v => OnAmountBoundChanged(newPaymentInput, v)"
-                            IsEditing="true" />
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-success" @onclick="AddPayment">Hinzufügen</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    <SubTableOverlay IsVisible="overlayPayment != null" Title="@overlayTitle" OnClose="ClosePaymentOverlay">
-        @if (overlayPayment != null)
-        {
-            @if (overlayPayment.ContractPayments == null || overlayPayment.ContractPayments.Count == 0)
-            {
-                <em>Keine Arbeitsverträge zugewiesen.</em>
-            }
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Mitarbeiter</th>
-                        <th>AV-ID</th>
-                        <th>Lohnanteil</th>
-                        <th>Reallohnanteil</th>
-                        <th>Von</th>
-                        <th>Bis</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var cp in (overlayPayment.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.ContractShare))
+                    }
+                    else
                     {
-                        var isEditingCA = editingContractAssignIds.Contains(cp.Id);
-                        var editCA = isEditingCA ? editContractAssignCopies[cp.Id] : cp;
-                        var caContractItems = ContractsForContractAssignEdit(overlayPayment, cp.ContractId)
-                            .Select(c => new EditableSelect<int>.SelectItem { Value = c.Id, Text = GetContractLabel(c.Id) });
+                        <EditableNumber @bind-Value="edit.Amount" IsEditing="false" Step="1" DisplayText="@p.Amount.ToString("C")" ShowCurrencySymbol="true" />
+                    }
+                </td>
+                <td>
+                    <EditableCheckbox
+                        Value="edit.AmountIsContractsBound"
+                        ValueChanged="v => OnAmountBoundChanged(edit, v)"
+                        IsEditing="isEditing" />
+                </td>
+                <td>
+                    @if (isEditing)
+                    {
+                        <button class="btn btn-sm btn-success me-1" @onclick="() => SavePayment(p.Id)">Speichern</button>
+                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => CancelEditPayment(p.Id)">Abbrechen</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPayment(p)">Bearbeiten</button>
+                        <button class="btn btn-sm btn-danger me-1" @onclick="() => DeletePayment(p)">Löschen</button>
+                        @if (ShowContractAssignments)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowPaymentOverlay(p)">Verträge zuweisen</button>
+                        }
+                    }
+                </td>
+            </tr>
+        }
+        
+    </tbody>
+    @if (ShowAddForm)
+    {
+        <tfoot>
+            <tr>
+                <td class="fst-italic text-muted">neu</td>
+                @if (showProjectCol)
+                {
+                    <td>
+                        <select class="form-control" @bind="newPaymentInput.ProjectId">
+                            <option value="0">-- auswählen --</option>
+                            @foreach (var pr in projects)
+                            {
+                                <option value="@pr.Id">@pr.Title</option>
+                            }
+                        </select>
+                    </td>
+                }
+                <td><EditableText @bind-Value="newPaymentInput.Title" IsEditing="true" /></td>
+                <td><EditableDate @bind-Value="newPaymentInput.Start" IsEditing="true" /></td>
+                <td><EditableDate @bind-Value="newPaymentInput.End" IsEditing="true" /></td>
+                <td>
+                    <select class="form-control" @bind="newPaymentInput.DetecatedTo">
+                        <option value="">-- keine Angabe --</option>
+                        @foreach (var g in Enum.GetValues<EmployeeGroup>())
+                        {
+                            <option value="@g">@g</option>
+                        }
+                    </select>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center gap-1">
+                        <EditableNumber @bind-Value="newPaymentInput.Amount" IsEditing="!newPaymentInput.AmountIsContractsBound" Step="1" DisplayText="@newPaymentInput.Amount.ToString("C")" ShowCurrencySymbol="true" />
+                        @if (!newPaymentInput.AmountIsContractsBound)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Betrag berechnen"
+                                @onclick="() => OpenCalculator(newPaymentInput.Start, newPaymentInput.End, newPaymentInput.DetecatedTo, v => { newPaymentInput.Amount = v; })">
+                                <span class="bi bi-calculator" aria-hidden="true"></span>
+                            </button>
+                        }
+                    </div>
+                </td>
+                <td>
+                    <EditableCheckbox
+                        Value="newPaymentInput.AmountIsContractsBound"
+                        ValueChanged="v => OnAmountBoundChanged(newPaymentInput, v)"
+                        IsEditing="true" />
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-success" @onclick="AddPayment">Hinzufügen</button>
+                </td>
+            </tr>
+        </tfoot>
+    }
+</table>
 
-                        <tr>
+<SubTableOverlay IsVisible="overlayPayment != null" Title="@overlayTitle" OnClose="ClosePaymentOverlay">
+    @if (overlayPayment != null)
+    {
+        @if (overlayPayment.ContractPayments == null || overlayPayment.ContractPayments.Count == 0)
+        {
+            <em>Keine Arbeitsverträge zugewiesen.</em>
+        }
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Mitarbeiter</th>
+                    <th>AV-ID</th>
+                    <th>Lohnanteil</th>
+                    <th>Reallohnanteil</th>
+                    <th>Von</th>
+                    <th>Bis</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var cp in (overlayPayment.ContractPayments ?? new List<ContractPayment>()).OrderByDescending(x => x.ContractShare))
+                {
+                    var isEditingCA = editingContractAssignIds.Contains(cp.Id);
+                    var editCA = isEditingCA ? editContractAssignCopies[cp.Id] : cp;
+                    var caContractItems = ContractsForContractAssignEdit(overlayPayment, cp.ContractId)
+                        .Select(c => new EditableSelect<int>.SelectItem { Value = c.Id, Text = GetContractLabel(c.Id) });
+
+                    <tr>
+                        @if (isEditingCA)
+                        {
+                            <td colspan="2"><EditableSelect @bind-Value="editCA.ContractId" IsEditing="true" DisplayText="@(cp.Contract?.Employee?.Name ?? "-")" Items="caContractItems" /></td>
+                        }
+                        else{
+                            <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
+                            <td>@($"AV-{cp.ContractId}")</td>
+                        }
+                        <td><EditablePercent @bind-Value="editCA.ContractSharePercent" IsEditing="isEditingCA" Step="1" /></td>
+                        <td>@(editCA.ContractSharePercent * (contracts.FirstOrDefault(c => c.Id == editCA.ContractId)?.Fte ?? 0))</td>
+                        <td><EditableNullableDate @bind-Value="editCA.Start" IsEditing="isEditingCA" /></td>
+                        <td><EditableNullableDate @bind-Value="editCA.End" IsEditing="isEditingCA" /></td>
+                        <td>
                             @if (isEditingCA)
                             {
-                                <td colspan="2"><EditableSelect @bind-Value="editCA.ContractId" IsEditing="true" DisplayText="@(cp.Contract?.Employee?.Name ?? "-")" Items="caContractItems" /></td>
+                                <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractAssignment(cp.Id, overlayPayment)">Speichern</button>
+                                <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractAssignment(cp.Id)">Abbrechen</button>
                             }
-                            else{
-                                <td>@(cp.Contract?.Employee?.Name ?? "-")</td>
-                                <td>@($"AV-{cp.ContractId}")</td>
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractAssignment(cp)">Bearbeiten</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, overlayPayment)">Entfernen</button>
                             }
-                            <td><EditablePercent @bind-Value="editCA.ContractSharePercent" IsEditing="isEditingCA" Step="1" /></td>
-                            <td>@(editCA.ContractSharePercent * (contracts.FirstOrDefault(c => c.Id == editCA.ContractId)?.Fte ?? 0))</td>
-                            <td><EditableNullableDate @bind-Value="editCA.Start" IsEditing="isEditingCA" /></td>
-                            <td><EditableNullableDate @bind-Value="editCA.End" IsEditing="isEditingCA" /></td>
-                            <td>
-                                @if (isEditingCA)
-                                {
-                                    <button class="btn btn-sm btn-success me-1" @onclick="() => SaveContractAssignment(cp.Id, overlayPayment)">Speichern</button>
-                                    <button class="btn btn-sm btn-secondary" @onclick="() => CancelEditContractAssignment(cp.Id)">Abbrechen</button>
-                                }
-                                else
-                                {
-                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditContractAssignment(cp)">Bearbeiten</button>
-                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteContractAssignment(cp.Id, overlayPayment)">Entfernen</button>
-                                }
-                            </td>
-                        </tr>
-                    }
-                    @{
-                        var newCAInput = GetOrAddContractAssignInput(overlayPayment.Id);
-                        var newCAContractItems = new[] { new EditableSelect<int>.SelectItem { Value = 0, Text = "-- auswählen --" } }
-                            .Concat(AvailableContractsForPayment(overlayPayment).Select(c => new EditableSelect<int>.SelectItem { Value = c.Id, Text = GetContractLabel(c.Id) }));
-                    }
-                    <tr>
-                        <td colspan="2"><EditableSelect @bind-Value="newCAInput.ContractId" IsEditing="true" DisplayText="-- auswählen --" Items="newCAContractItems" /></td>
-                        <td><EditablePercent @bind-Value="newCAInput.ContractSharePercent" IsEditing="true" Step="1" /></td>
-                        <td></td>
-                        <td><EditableNullableDate @bind-Value="newCAInput.Start" IsEditing="true" /></td>
-                        <td><EditableNullableDate @bind-Value="newCAInput.End" IsEditing="true" /></td>
-                        <td><button class="btn btn-sm btn-success" @onclick="() => AddContractAssignment(overlayPayment)">Zuweisen</button></td>
+                        </td>
                     </tr>
-                </tbody>
-            </table>
-        }
-    </SubTableOverlay>
-}
+                }
+                @{
+                    var newCAInput = GetOrAddContractAssignInput(overlayPayment.Id);
+                    var newCAContractItems = new[] { new EditableSelect<int>.SelectItem { Value = 0, Text = "-- auswählen --" } }
+                        .Concat(AvailableContractsForPayment(overlayPayment).Select(c => new EditableSelect<int>.SelectItem { Value = c.Id, Text = GetContractLabel(c.Id) }));
+                }
+                <tr>
+                    <td colspan="2"><EditableSelect @bind-Value="newCAInput.ContractId" IsEditing="true" DisplayText="-- auswählen --" Items="newCAContractItems" /></td>
+                    <td><EditablePercent @bind-Value="newCAInput.ContractSharePercent" IsEditing="true" Step="1" /></td>
+                    <td></td>
+                    <td><EditableNullableDate @bind-Value="newCAInput.Start" IsEditing="true" /></td>
+                    <td><EditableNullableDate @bind-Value="newCAInput.End" IsEditing="true" /></td>
+                    <td><button class="btn btn-sm btn-success" @onclick="() => AddContractAssignment(overlayPayment)">Zuweisen</button></td>
+                </tr>
+            </tbody>
+        </table>
+    }
+</SubTableOverlay>
 
 @if (showCalculatorModal)
 {

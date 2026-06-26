@@ -18,10 +18,10 @@
     <h3 class="text-primary-emphasis mb-0">Mitarbeiter</h3>
     <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv">
-            <span class="bi bi-download me-1" aria-hidden="true"></span>CSV Export
+            <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Export
         </button>
         <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
-            <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
+            <span class="bi bi-download me-1" aria-hidden="true"></span>CSV Import
         </button>
     </div>
 </div>
@@ -38,48 +38,54 @@
 }
 
 <table class="table table-striped">
-        <thead>
+    <colgroup>
+        <col style="width: 1%" />
+        <col />
+        <col />
+        <col />
+    </colgroup>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Eingestellt am</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (Employee e in employees)
+        {
+            var isEditing = editingEmployeeId == e.Id;
+            var edit = isEditing ? editEmployeeCopies[e.Id] : e;
             <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Eingestellt am</th>
-                <th></th>
+                <td class="fst-italic">@e.Id</td>
+                <td><EditableText @bind-Value="edit.Name" IsEditing="isEditing" /></td>
+                <td><EditableDate @bind-Value="edit.HireDate" IsEditing="isEditing" /></td>
+                <td>
+                @if (isEditing)
+                {
+                    <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
+                    <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
+                    <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
+                }
+                </td>
             </tr>
-        </thead>
-        <tbody>
-            @foreach (Employee e in employees)
-            {
-                var isEditing = editingEmployeeId == e.Id;
-                var edit = isEditing ? editEmployeeCopies[e.Id] : e;
-                <tr>
-                    <td class="fst-italic">@e.Id</td>
-                    <td><EditableText @bind-Value="edit.Name" IsEditing="isEditing" /></td>
-                    <td><EditableDate @bind-Value="edit.HireDate" IsEditing="isEditing" /></td>
-                    <td>
-                    @if (isEditing)
-                    {
-                        <button class="btn btn-sm btn-success me-2" @onclick="() => SaveEmployee(e.Id)">Speichern</button>
-                        <button class="btn btn-sm btn-secondary me-2" @onclick="() => CancelEditEmployee(e.Id)">Abbrechen</button>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(e)">Bearbeiten</button>
-                        <button type="button" class="btn btn-danger btn-sm me-2" @onclick="@(a => Delete(e))">Löschen</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => overlayEmployee = e">Arbeitsverträge</button>
-                    }
-                    </td>
-                </tr>
-            }
-        </tbody>
-        <tfoot>
-            <tr>
-                <td class="fst-italic text-muted">neu</td>
-                <td><input class="form-control" placeholder="Name" @bind="employee.Name" /></td>
-                <td><input type="date" class="form-control" @bind="employee.HireDate" /></td>
-                <td><button type="button" class="btn btn-sm btn-success" @onclick="Add">Hinzufügen</button></td>
-            </tr>
-        </tfoot>
-    </table>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <td class="fst-italic text-muted">neu</td>
+            <td><input class="form-control" placeholder="Name" @bind="employee.Name" /></td>
+            <td><input type="date" class="form-control" @bind="employee.HireDate" /></td>
+            <td><button type="button" class="btn btn-sm btn-success" @onclick="Add">Hinzufügen</button></td>
+        </tr>
+    </tfoot>
+</table>
 
 <SubTableOverlay IsVisible="overlayEmployee != null"
     Title="@(overlayEmployee != null ? $"Arbeitsverträge: {overlayEmployee.Name}" : "")"

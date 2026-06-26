@@ -9,16 +9,18 @@
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject oedibud.Services.CsvExportService CsvExporter
 
+
+
 <PageTitle>Projekte</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h3 class="text-primary-emphasis mb-0">Projekte</h3>
     <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv">
-            <span class="bi bi-download me-1" aria-hidden="true"></span>CSV Export
+            <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Export
         </button>
         <button class="btn btn-outline-secondary btn-sm" @onclick="() => showImport = true">
-            <span class="bi bi-upload me-1" aria-hidden="true"></span>CSV Import
+            <span class="bi bi-download me-1" aria-hidden="true"></span>CSV Import
         </button>
     </div>
 </div>
@@ -34,12 +36,15 @@
     <div class="alert alert-info">@message</div>
 }
 
-@if (projects.Count == 0)
-{
-    <p>Keine Projekte verfügbar.</p>
-}
-
 <table class="table table-striped">
+    <colgroup>
+        <col style="width: 1%" />
+        <col />
+        <col />
+        <col />
+        <col />
+        <col style="border: none;" />
+    </colgroup>
     <thead>
         <tr>
             <th>ID</th>
@@ -54,7 +59,7 @@
         @foreach (var p in projects)
         {
             <tr>
-                <td>@p.Id</td>
+                <td class="text-nowrap w-auto">@p.Id</td>
                 @if (editingProjectId == p.Id)
                 {
                     <td><input class="form-control" @bind="editProjectCopy.Title" /></td>
@@ -80,6 +85,8 @@
                 }
             </tr>
         }
+    </tbody>
+    <tfoot>
         <tr>
             <td class="fst-italic text-muted">neu</td>
             <td><input class="form-control" placeholder="Titel" @bind="newProject.Title" /></td>
@@ -90,7 +97,7 @@
                 <button class="btn btn-sm btn-success" @onclick="AddProject">Hinzufügen</button>
             </td>
         </tr>
-    </tbody>
+    </tfoot>
 </table>
 
 <SubTableOverlay IsVisible="overlayProject != null"
